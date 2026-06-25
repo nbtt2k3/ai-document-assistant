@@ -1,0 +1,32 @@
+# Core LangChain
+langchain==0.3.7
+langchain-community==0.3.7
+langchain-chroma==0.1.4
+langchain-ollama==0.2.1
+
+# Document loaders & text splitter
+pypdf==5.1.0
+docx2txt==0.9
+
+# OCR
+easyocr==1.7.1
+opencv-python==4.10.0.84
+
+# Vector database & Search
+chromadb==0.5.23
+rank_bm25==0.2.2
+
+# Environment & utilities
+python-dotenv==1.0.1
+
+# API & Backend
+fastapi
+uvicorn
+pydantic
+
+# Database & Auth
+sqlalchemy
+psycopg2-binary
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart
