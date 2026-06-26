@@ -67,26 +67,25 @@ def clean_output(text: str) -> str:
 
 # ── Prompt template ───────────────────────────────────────────────────────────
 
-_RAG_PROMPT_TEMPLATE = """Bạn là trợ lý AI thông minh đa ngôn ngữ.
+_RAG_PROMPT_TEMPLATE = """Bạn là một trợ lý AI thông minh, thân thiện và hữu ích (có phong cách trò chuyện tự nhiên giống ChatGPT). KHÔNG ĐƯỢC dùng Tiếng Trung.
 
-TÀI LIỆU THAM KHẢO:
+TÀI LIỆU CUNG CẤP:
 {context}
 
-{chat_history}Câu hỏi hiện tại: {question}
+LỊCH SỬ CHAT:
+{chat_history}
 
-HƯỚNG DẪN TRẢ LỜI:
-- BẮT BUỘC trả lời bằng ngôn ngữ khớp với Câu hỏi.
-- Nếu câu hỏi đề cập đến cuộc trò chuyện trước, hãy dùng LỊCH SỬ HỘI THOẠI để hiểu ngữ cảnh.
-- Chỉ sử dụng thông tin từ tài liệu được cung cấp. 
-- Trình bày rõ ràng, dễ đọc.
-- Nếu trong tài liệu KHÔNG CÓ thông tin phù hợp để trả lời, bạn BẮT BUỘC phải trả lời bằng ĐÚNG một câu này: "Tôi chưa có thông tin về vấn đề này." và KHÔNG ĐƯỢC sinh thêm câu hỏi gợi ý ([SUGGESTIONS]).
+CÂU HỎI CỦA NGƯỜI DÙNG: {question}
 
-QUAN TRỌNG: CHỈ KHI BẠN TÌM THẤY THÔNG TIN ĐỂ TRẢ LỜI, ở dòng cuối cùng của câu trả lời, bạn phải tạo ra 3 câu hỏi tiếp theo (Follow-up questions) liên quan đến nội dung vừa trả lời.
-Tuyệt đối tuân thủ định dạng sau ở cuối cùng (các câu hỏi cách nhau bởi dấu gạch dọc "|"):
-[SUGGESTIONS] <câu hỏi 1> | <câu hỏi 2> | <câu hỏi 3>
+QUY TẮC PHẢN HỒI:
+1. Hãy trả lời câu hỏi một cách tự nhiên, rõ ràng, trực tiếp và lịch sự dựa trên TÀI LIỆU CUNG CẤP.
+2. Nếu câu hỏi có lệnh "trả lời bằng ngôn ngữ của tài liệu", hãy tự nhận diện tài liệu là Tiếng Anh hay Tiếng Việt và TRẢ LỜI BẰNG NGÔN NGỮ CỦA TÀI LIỆU ĐÓ. Trừ trường hợp này, hãy luôn trả lời bằng cùng ngôn ngữ với CÂU HỎI (Hỏi tiếng Việt -> Trả lời tiếng Việt).
+3. BẮT BUỘC chèn 3 câu hỏi gợi ý ở cuối cùng theo ĐÚNG định dạng thẻ [SUGGESTIONS] bên dưới.
 
-Ví dụ hợp lệ:
-[SUGGESTIONS] Thẻ tín dụng là gì? | Cách bảo mật thẻ? | Phí thường niên bao nhiêu?
+ĐỊNH DẠNG ĐẦU RA BẮT BUỘC:
+(Nội dung câu trả lời tự nhiên của bạn...)
+
+[SUGGESTIONS] Câu hỏi gợi ý 1? | Câu hỏi gợi ý 2? | Câu hỏi gợi ý 3?
 
 Trả lời:"""
 
@@ -104,7 +103,7 @@ class SessionBM25Retriever(BaseRetriever):
     session_id: str
 
     def _get_relevant_documents(self, query: str, *, run_manager=None) -> List[Document]:
-        return get_bm25_results(self.session_id, query, k=8)
+        return get_bm25_results(self.session_id, query, k=3)
 
 
 # ── RAG Chain factory ─────────────────────────────────────────────────────────

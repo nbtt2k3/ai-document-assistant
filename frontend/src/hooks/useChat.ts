@@ -10,24 +10,17 @@ const API_BASE = 'http://127.0.0.1:8000/api';
 export function parseBotMessage(rawContent: string): ParsedBotMessage {
   let displayContent = rawContent;
   let suggestions: string[] = [];
-  const suggestMatch = rawContent.match(/\[SUGGESTIONS\]([\s\S]*)/i);
+  const suggestMatch = rawContent.match(/\[SUGGESTIONS\]([^\n]*)/i);
   if (suggestMatch) {
     displayContent = rawContent.replace(suggestMatch[0], '').trim();
     // Tách và dọn dẹp các câu hỏi
     const rawText = suggestMatch[1].replace(/\d+\.\s/g, '|').replace(/"/g, '');
     suggestions = rawText.split('|').map((s) => s.trim()).filter((s) => s.length > 5 && s.includes('?'));
   }
-  
+
   // Xóa ký tự '|' dư thừa ở cuối văn bản nếu có
   if (displayContent.endsWith('|')) {
     displayContent = displayContent.slice(0, -1).trim();
-  }
-
-  // Chống lỗi AI cố tình tạo gợi ý ảo khi không có thông tin
-  const noInfoPhrases = ["chưa có thông tin", "không có thông tin", "không được đề cập"];
-  const isNoInfo = noInfoPhrases.some(phrase => displayContent.toLowerCase().includes(phrase));
-  if (isNoInfo) {
-    suggestions = [];
   }
 
   return { content: displayContent, suggestions };
@@ -78,13 +71,13 @@ export function useChat(activeSessionId: string | null) {
 
       setMessages((prev) => [
         ...prev,
-        { role: 'user', content: `📎 **Đã tải lên tài liệu:** ${file.name}` },
+        { role: 'user', content: `**${file.name}**` },
       ]);
 
       // Tự động tóm tắt nội dung file vừa upload
       setTimeout(() => {
         sendQuery(
-          'Tài liệu tôi vừa tải lên có nội dung chính là gì? Hãy tóm tắt ngắn gọn và gợi ý cho tôi 3 câu hỏi để bắt đầu tìm hiểu sâu hơn.',
+          `[SYSTEM] File "${file.name}" vừa được tải lên. Hãy đóng vai một trợ lý AI thông minh giống ChatGPT: \n1. Xác nhận thân thiện rằng bạn đã nhận được file.\n2. Tóm tắt nội dung chính của tài liệu một cách tự nhiên và dễ hiểu.\n3. Hãy trả lời bằng ngôn ngữ của tài liệu.`,
           true
         );
       }, 500);
@@ -126,6 +119,7 @@ export function useChat(activeSessionId: string | null) {
       const decoder = new TextDecoder('utf-8');
 
       let botResponse = '';
+      let buffer = '';
       setMessages((prev) => [
         ...prev,
         { role: 'bot', content: '', isThinking: true },
@@ -135,35 +129,40 @@ export function useChat(activeSessionId: string | null) {
         const { value, done } = await reader.read();
         if (done) break;
 
-        const chunk = decoder.decode(value, { stream: true });
-        const lines = chunk.split('\n\n');
+        buffer += decoder.decode(value, { stream: true });
 
-        for (const line of lines) {
-          if (!line.startsWith('data: ')) continue;
-          const dataStr = line.slice(6);
-          if (dataStr === '[DONE]') break;
+        let boundary = buffer.indexOf('\n\n');
+        while (boundary !== -1) {
+          const chunkStr = buffer.slice(0, boundary);
+          buffer = buffer.slice(boundary + 2);
 
-          try {
-            const parsed = JSON.parse(dataStr);
-            if (parsed.type === 'chunk' || parsed.type === 'final_answer') {
-              botResponse =
-                parsed.type === 'chunk' ? botResponse + parsed.content : parsed.content;
+          if (chunkStr.startsWith('data: ')) {
+            const dataStr = chunkStr.slice(6);
+            if (dataStr === '[DONE]') break;
 
-              const { content, suggestions } = parseBotMessage(botResponse);
-              setMessages((prev) => {
-                const updated = [...prev];
-                updated[updated.length - 1] = {
-                  ...updated[updated.length - 1],
-                  content,
-                  suggestions,
-                  isThinking: false,
-                };
-                return updated;
-              });
+            try {
+              const parsed = JSON.parse(dataStr);
+              if (parsed.type === 'chunk' || parsed.type === 'final_answer') {
+                botResponse =
+                  parsed.type === 'chunk' ? botResponse + parsed.content : parsed.content;
+
+                const { content, suggestions } = parseBotMessage(botResponse);
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  updated[updated.length - 1] = {
+                    ...updated[updated.length - 1],
+                    content,
+                    suggestions,
+                    isThinking: content.trim() === '' && parsed.type !== 'final_answer',
+                  };
+                  return updated;
+                });
+              }
+            } catch (err) {
+              console.error('Parse error', err, dataStr);
             }
-          } catch (err) {
-            console.error('Parse error', err, dataStr);
           }
+          boundary = buffer.indexOf('\n\n');
         }
       }
     } catch (err) {

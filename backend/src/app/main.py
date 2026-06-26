@@ -1,11 +1,10 @@
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
-from sqlalchemy.orm import Session
 import uvicorn
 
 from src.app.db.database import engine, Base
 # Import tất cả models để SQLAlchemy đăng ký đầy đủ trước khi create_all
-from src.app.models import User, Session, Message  # noqa: F401
+from src.app.models import User, Session as DBSession, Message  # noqa: F401
 from src.app.api import auth, sessions, chat
 
 # Tạo các bảng DB nếu chưa có (bao bọc try/except để app không crash khi DB chưa sẵn sàng)

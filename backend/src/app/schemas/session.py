@@ -9,6 +9,10 @@ class SessionCreate(BaseModel):
     """Body request để tạo session mới."""
     title: str
 
+class SessionUpdate(BaseModel):
+    """Body request để cập nhật session."""
+    title: str
+
 
 class SessionResponse(BaseModel):
     """Response trả về thông tin một session."""

@@ -42,12 +42,25 @@ export function useSession() {
     }
   };
 
+  // Cập nhật tiêu đề session
+  const updateSessionTitle = async (id: string, newTitle: string) => {
+    try {
+      const res = await fetchAPI(`/sessions/${id}`, {
+        method: 'PUT',
+        body: JSON.stringify({ title: newTitle }),
+      });
+      if (res.ok) {
+        setSessions((prev) =>
+          prev.map((s) => (s.id === id ? { ...s, title: newTitle } : s))
+        );
+      }
+    } catch (e) {
+      console.error('updateSessionTitle error:', e);
+    }
+  };
+
   // Xoá session theo id
   const deleteSession = async (id: string): Promise<boolean> => {
-    const confirmed = window.confirm(
-      'Bạn có chắc chắn muốn xoá cuộc trò chuyện này không? Toàn bộ tài liệu tải lên cũng sẽ bị xoá khỏi hệ thống.'
-    );
-    if (!confirmed) return false;
 
     try {
       const res = await fetchAPI(`/sessions/${id}`, { method: 'DELETE' });
@@ -82,6 +95,7 @@ export function useSession() {
     activeSessionId,
     loadSessions,
     createSession,
+    updateSessionTitle,
     deleteSession,
     selectSession,
     setActiveSessionId,

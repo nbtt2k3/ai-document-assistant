@@ -47,7 +47,7 @@ def get_retriever_for_session(session_id: str):
     db = _get_chroma_db()
     return db.as_retriever(
         search_kwargs={
-            "k": 8,
+            "k": 3,
             "filter": {"session_id": session_id}
         }
     )

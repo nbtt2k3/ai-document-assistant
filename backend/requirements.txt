@@ -9,8 +9,8 @@ pypdf==5.1.0
 docx2txt==0.9
 
 # OCR
-easyocr==1.7.1
-opencv-python==4.10.0.84
+paddlepaddle==3.3.1
+paddleocr==3.7.0
 
 # Vector database & Search
 chromadb==0.5.23

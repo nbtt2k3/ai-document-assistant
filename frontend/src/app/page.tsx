@@ -2,7 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { Menu } from 'lucide-react';
+import { Menu, AlertTriangle } from 'lucide-react';
 
 import { getAuthToken, removeAuthToken } from '@/lib/api';
 import { useSession } from '@/hooks/useSession';
@@ -16,12 +16,14 @@ export default function ChatPage() {
   const router = useRouter();
   const [isSidebarOpen, setIsSidebarOpen] = useState(false); // For mobile
   const [isSidebarCollapsed, setIsSidebarCollapsed] = useState(false); // For desktop
+  const [sessionToDelete, setSessionToDelete] = useState<string | null>(null);
 
   const {
     sessions,
     activeSessionId,
     loadSessions,
     createSession,
+    updateSessionTitle,
     deleteSession,
     selectSession,
     setActiveSessionId,
@@ -74,10 +76,29 @@ export default function ChatPage() {
 
   const handleDeleteSession = async (e: React.MouseEvent, id: string) => {
     e.stopPropagation();
-    const deleted = await deleteSession(id);
-    if (deleted && activeSessionId === id) {
+    setSessionToDelete(id);
+  };
+
+  const confirmDelete = async () => {
+    if (!sessionToDelete) return;
+    const deleted = await deleteSession(sessionToDelete);
+    if (deleted && activeSessionId === sessionToDelete) {
       clearMessages();
     }
+    setSessionToDelete(null);
+  };
+
+  const handleSendQuery = async (text: string) => {
+    if (!text.trim()) return;
+    
+    // Đổi tên nếu tiêu đề vẫn là mặc định
+    const currentSession = sessions.find(s => s.id === activeSessionId);
+    if (currentSession && currentSession.title.startsWith('Cuộc trò chuyện')) {
+      const newTitle = text.length > 30 ? text.slice(0, 30) + '...' : text;
+      updateSessionTitle(activeSessionId!, newTitle);
+    }
+    
+    await sendQuery(text);
   };
 
   return (
@@ -131,12 +152,12 @@ export default function ChatPage() {
             <ChatWindow
               messages={messages}
               isStreaming={isStreaming}
-              onSuggestionClick={(text) => sendQuery(text)}
+              onSuggestionClick={handleSendQuery}
             />
             <InputBar
               isStreaming={isStreaming}
               isUploading={isUploading}
-              onSend={(text) => sendQuery(text)}
+              onSend={handleSendQuery}
               onFileSelect={(file) => uploadFile(file)}
             />
           </>
@@ -147,6 +168,27 @@ export default function ChatPage() {
           </div>
         )}
       </div>
+
+      {/* Custom Delete Modal */}
+      {sessionToDelete && (
+        <div className={styles.modalOverlay}>
+          <div className={styles.modalContent}>
+            <div className={styles.modalHeader}>
+              <AlertTriangle size={24} className={styles.modalIcon} />
+              <h3>Xoá cuộc trò chuyện</h3>
+            </div>
+            <p>Bạn có chắc chắn muốn xoá cuộc trò chuyện này không?<br/>Toàn bộ tài liệu tải lên cũng sẽ bị xoá vĩnh viễn.</p>
+            <div className={styles.modalActions}>
+              <button className={styles.cancelBtn} onClick={() => setSessionToDelete(null)}>
+                Hủy
+              </button>
+              <button className={styles.confirmBtn} onClick={confirmDelete}>
+                Xoá
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }

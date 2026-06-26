@@ -15,6 +15,8 @@ from langchain_community.document_loaders import TextLoader
 from langchain_core.documents import Document
 from pypdf import PdfReader
 import docx2txt
+from PIL import Image
+import io
 
 from src.app.ocr.image_reader import ImageOCRLoader
 
@@ -37,11 +39,26 @@ class CustomPDFLoader:
                 img_contents = []
                 for img_index, image_obj in enumerate(page.images):
                     image_bytes = image_obj.data
-                    ext = image_obj.name.split('.')[-1] if '.' in image_obj.name else "png"
+                    
+                    try:
+                        # Dùng Pillow để đọc và chuyển đổi mọi định dạng (kể cả JP2) sang PNG
+                        img = Image.open(io.BytesIO(image_bytes))
+                        
+                        # Bỏ qua các ảnh quá nhỏ (logo, icon, v.v.)
+                        if img.width < 100 or img.height < 100:
+                            print(f"  ⏩ Bỏ qua ảnh {img_index+1} (kích thước quá nhỏ: {img.width}x{img.height})")
+                            continue
 
-                    with tempfile.NamedTemporaryFile(delete=False, suffix=f".{ext}") as tmp:
-                        tmp.write(image_bytes)
-                        tmp_path = tmp.name
+                        # Nếu ảnh ở mode CMYK hoặc các mode lạ, chuyển về RGB
+                        if img.mode not in ("RGB", "L"):
+                            img = img.convert("RGB")
+                            
+                        with tempfile.NamedTemporaryFile(delete=False, suffix=".png") as tmp:
+                            img.save(tmp, format="PNG")
+                            tmp_path = tmp.name
+                    except Exception as e:
+                        print(f"  ❌ Lỗi convert ảnh {img_index+1} sang PNG: {e}")
+                        continue
 
                     try:
                         print(f"  📎 Ảnh {img_index+1} — trang {page_num+1} "
@@ -81,6 +98,14 @@ class CustomDocxLoader:
 
                 img_contents = []
                 for img_file in glob.glob(os.path.join(tmp_dir, "*")):
+                    try:
+                        with Image.open(img_file) as img:
+                            if img.width < 100 or img.height < 100:
+                                print(f"  ⏩ Bỏ qua ảnh DOCX (kích thước quá nhỏ: {img.width}x{img.height})")
+                                continue
+                    except Exception:
+                        pass
+                        
                     print(f"  📎 Ảnh trong DOCX: {os.path.basename(self.file_path)}")
                     img_docs = ImageOCRLoader(img_file).load()
                     if img_docs:

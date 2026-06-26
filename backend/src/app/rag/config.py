@@ -7,8 +7,8 @@ Cấu hình hạ tầng web nằm ở: src/app/core/config.py
 
 # ── LLM & Embedding ───────────────────────────────────────────────────────────
 EMBEDDING_MODEL = "bge-m3"
-LLM_MODEL       = "qwen2.5:7b"
+LLM_MODEL       = "qwen3:4b"
 
 # ── Text splitting ────────────────────────────────────────────────────────────
-CHUNK_SIZE    = 1500
-CHUNK_OVERLAP = 200
+CHUNK_SIZE    = 800
+CHUNK_OVERLAP = 150

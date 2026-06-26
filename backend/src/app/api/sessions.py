@@ -5,9 +5,8 @@ from typing import List
 
 from src.app.db.database import get_db
 from src.app.models.session import Session as DBSession
-from src.app.models.message import Message as DBMessage
 from src.app.core.security import get_current_user_id
-from src.app.schemas.session import SessionCreate, SessionResponse, MessageResponse
+from src.app.schemas.session import SessionCreate, SessionUpdate, SessionResponse, MessageResponse
 from src.app.services.document_service import (
     get_supported_extensions,
     save_upload_file,
@@ -44,6 +43,26 @@ def create_session(
     db.commit()
     db.refresh(new_session)
     return new_session
+
+@router.put("/{session_id}", response_model=SessionResponse)
+def update_session(
+    session_id: str,
+    session_update: SessionUpdate,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    session = (
+        db.query(DBSession)
+        .filter(DBSession.id == session_id, DBSession.user_id == user_id)
+        .first()
+    )
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+    
+    session.title = session_update.title
+    db.commit()
+    db.refresh(session)
+    return session
 
 
 @router.get("/{session_id}/messages", response_model=List[MessageResponse])
@@ -94,6 +113,13 @@ async def upload_file(
 
     try:
         num_segments = process_upload(session_id, file_path, file.filename)
+        
+        # Lưu tin nhắn báo upload file vào DB để không bị mất khi reload
+        from src.app.models.message import Message as DBMessage
+        upload_msg = DBMessage(session_id=session_id, role="user", content=f"**{file.filename}**")
+        db.add(upload_msg)
+        db.commit()
+        
         return {"message": f"Đã xử lý thành công {num_segments} đoạn từ {file.filename}"}
     except Exception as e:
         raise HTTPException(status_code=500, detail=f"Lỗi xử lý file: {str(e)}")
