@@ -16,7 +16,14 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
 
-from src.app.rag.config import LLM_MODEL
+from langchain_openai import ChatOpenAI
+from langchain_google_genai import ChatGoogleGenerativeAI
+
+from src.app.rag.config import (
+    LLM_MODEL, 
+    OPENAI_API_KEY, OPENAI_LLM_MODEL,
+    GEMINI_API_KEY, GEMINI_LLM_MODEL
+)
 from src.app.rag.vectorstore import get_retriever_for_session
 from src.app.rag.bm25 import get_bm25_results
 
@@ -123,11 +130,27 @@ def create_rag_chain_for_session(session_id: str):
         weights=[0.5, 0.5]
     )
 
-    llm = OllamaLLM(
-        model=LLM_MODEL,
-        temperature=0.0,
-        stop=_STOP_SEQUENCES,
-    )
+    # Chọn LLM dựa trên cấu hình API key
+    if OPENAI_API_KEY:
+        llm = ChatOpenAI(
+            model=OPENAI_LLM_MODEL,
+            api_key=OPENAI_API_KEY,
+            temperature=0.0,
+            stop=_STOP_SEQUENCES,
+        )
+    elif GEMINI_API_KEY:
+        llm = ChatGoogleGenerativeAI(
+            model=GEMINI_LLM_MODEL,
+            google_api_key=GEMINI_API_KEY,
+            temperature=0.0,
+            stop=_STOP_SEQUENCES,
+        )
+    else:
+        llm = OllamaLLM(
+            model=LLM_MODEL,
+            temperature=0.0,
+            stop=_STOP_SEQUENCES,
+        )
 
     prompt = ChatPromptTemplate.from_template(_RAG_PROMPT_TEMPLATE)
 
