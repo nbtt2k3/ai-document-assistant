@@ -1,4 +1,4 @@
-# Pro RAG Chatbot
+# AI Document Assistant
 
 Một hệ thống trợ lý ảo AI (Retrieval-Augmented Generation - RAG) toàn diện, cho phép tải tài liệu lên (PDF, DOCX) và trò chuyện dựa trên nội dung tài liệu. Dự án được thiết kế theo kiến trúc Client-Server (Next.js + FastAPI), tích hợp sẵn xác thực người dùng, lưu trữ lịch sử chat, và khả năng đọc hiểu cả các tài liệu scan bằng công nghệ nhận dạng ký tự quang học (OCR).
 
