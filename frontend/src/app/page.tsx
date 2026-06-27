@@ -26,7 +26,6 @@ export default function ChatPage() {
     updateSessionTitle,
     deleteSession,
     selectSession,
-    setActiveSessionId,
   } = useSession();
 
   const {
@@ -48,14 +47,14 @@ export default function ChatPage() {
       return;
     }
     loadSessions();
-  }, []);
+  }, [router, loadSessions]);
 
   // Load messages khi chuyển session
   useEffect(() => {
     if (activeSessionId) {
       loadMessages(activeSessionId);
     }
-  }, [activeSessionId]);
+  }, [activeSessionId, loadMessages]);
 
   const handleLogout = () => {
     removeAuthToken();

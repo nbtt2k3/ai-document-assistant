@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { fetchAPI, setAuthToken } from '@/lib/api';
+import { setAuthToken } from '@/lib/api';
 import styles from './login.module.css';
 
 export default function LoginPage() {
@@ -58,8 +58,12 @@ export default function LoginPage() {
         setIsLogin(true);
         setError('Đăng ký thành công! Vui lòng đăng nhập.');
       }
-    } catch (err: any) {
-      setError(err.message);
+    } catch (err) {
+      if (err instanceof Error) {
+        setError(err.message);
+      } else {
+        setError(String(err));
+      }
     } finally {
       setLoading(false);
     }

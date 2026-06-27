@@ -33,8 +33,12 @@ export default function TOCModal({ sessionId, onClose, onSummarize }: TOCModalPr
         if (!res.ok) throw new Error('Không thể lấy mục lục');
         const data = await res.json();
         setToc(data.toc || []);
-      } catch (err: any) {
-        setError(err.message);
+      } catch (err) {
+        if (err instanceof Error) {
+          setError(err.message);
+        } else {
+          setError(String(err));
+        }
       } finally {
         setLoading(false);
       }

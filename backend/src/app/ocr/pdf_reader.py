@@ -13,8 +13,6 @@ import tempfile
 
 from langchain_community.document_loaders import TextLoader
 from langchain_core.documents import Document
-from pypdf import PdfReader
-import docx2txt
 from PIL import Image
 import io
 
@@ -36,19 +34,19 @@ class CustomPDFLoader:
         
         docs = []
         try:
-            # 1. Trích xuất markdown (Sử dụng MarkItDown thay vì pymupdf4llm để tránh lỗi ONNX trên Windows)
+            # 1. Trích xuất markdown (Ưu tiên pymupdf4llm để lấy Mục lục chuẩn)
             try:
+                import pymupdf4llm
+                md_pages = pymupdf4llm.to_markdown(self.file_path, page_chunks=True)
+                combined_md = ""
+                for page in md_pages:
+                    combined_md += page["text"] + "\n\n"
+            except Exception:
+                # Lỗi ONNX xảy ra, âm thầm fallback sang MarkItDown (không in lỗi rác ra màn hình)
                 from markitdown import MarkItDown
                 md = MarkItDown()
                 result = md.convert(self.file_path)
                 combined_md = result.text_content
-            except Exception as e:
-                print(f"  [WARNING] Lỗi MarkItDown: {e}. Fallback sang fitz text thường...")
-                combined_md = ""
-                temp_doc = fitz.open(self.file_path)
-                for page in temp_doc:
-                    combined_md += page.get_text() + "\n\n"
-                temp_doc.close()
                 
             doc_fitz = fitz.open(self.file_path)
 
