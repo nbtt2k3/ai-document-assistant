@@ -36,6 +36,7 @@ export default function ChatPage() {
     loadMessages,
     uploadFile,
     sendQuery,
+    summarizeSection,
     clearMessages,
   } = useChat(activeSessionId);
 
@@ -150,9 +151,11 @@ export default function ChatPage() {
         {activeSessionId ? (
           <>
             <ChatWindow
+              sessionId={activeSessionId}
               messages={messages}
               isStreaming={isStreaming}
               onSuggestionClick={handleSendQuery}
+              onSummarizeSection={summarizeSection}
             />
             <InputBar
               isStreaming={isStreaming}

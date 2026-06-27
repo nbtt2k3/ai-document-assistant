@@ -34,8 +34,9 @@ def _split_text(docs: list[Document]) -> list[Document]:
 
 def add_documents_to_session(session_id: str, docs: list[Document]):
     """Thêm documents vào Chroma, gắn tag session_id để filter sau."""
-    for doc in docs:
+    for i, doc in enumerate(docs):
         doc.metadata["session_id"] = session_id
+        doc.metadata["chunk_index"] = i
 
     splits = _split_text(docs)
     db = _get_chroma_db()
@@ -45,10 +46,37 @@ def add_documents_to_session(session_id: str, docs: list[Document]):
 def get_retriever_for_session(session_id: str):
     """Lấy Chroma retriever với filter theo session_id."""
     db = _get_chroma_db()
+    
+    # Đếm số lượng chunks thực tế của session này để tránh lỗi hnswlib "Cannot return the results in a contigious 2D array"
+    try:
+        results = db.get(where={"session_id": session_id}, include=[])
+        num_chunks = len(results.get("ids", []))
+    except Exception:
+        num_chunks = 3
+
+    # Nếu không có chunk nào, vẫn set k=1 để Langchain không lỗi
+    k = min(3, num_chunks) if num_chunks > 0 else 1
+
     return db.as_retriever(
         search_kwargs={
-            "k": 3,
+            "k": k,
             "filter": {"session_id": session_id}
+        }
+    )
+
+def get_retriever_for_section(session_id: str, section_title: str, level: int):
+    """Lấy Chroma retriever chỉ filter các chunk thuộc một section cụ thể."""
+    db = _get_chroma_db()
+    header_key = f"Header {level}"
+    return db.as_retriever(
+        search_kwargs={
+            "k": 100,  # Lấy nhiều nhất có thể cho một section
+            "filter": {
+                "$and": [
+                    {"session_id": session_id},
+                    {header_key: section_title}
+                ]
+            }
         }
     )
 

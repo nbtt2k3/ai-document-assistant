@@ -50,6 +50,8 @@ async def create_event_stream(
     session_id: str,
     question: str,
     history_text: str,
+    section_title: str = None,
+    level: int = None,
 ) -> AsyncGenerator[str, None]:
     """
     Generator cho SSE streaming — toàn bộ RAG pipeline.
@@ -61,8 +63,10 @@ async def create_event_stream(
         session_id   : Session cần query.
         question     : Câu hỏi thực sự của user (đã bỏ [SYSTEM] prefix).
         history_text : Lịch sử hội thoại đã định dạng (từ build_history_text).
+        section_title: (Optional) Tên chương mục cần tóm tắt.
+        level        : (Optional) Cấp độ của chương mục (1, 2, 3).
     """
-    chain = create_rag_chain_for_session(session_id)
+    chain = create_rag_chain_for_session(session_id, section_title, level)
     raw_chunks = []
 
     try:

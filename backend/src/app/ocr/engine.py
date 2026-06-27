@@ -30,7 +30,7 @@ def get_ocr_reader():
             _ocr_reader = PaddleOCR(use_textline_orientation=True, lang='vi', enable_mkldnn=False)
             print("[INFO] PaddleOCR model đã sẵn sàng.")
         except Exception as e:
-            print(f"❌ Lỗi khởi tạo OCR: {e}")
+            print(f"[ERROR] Lỗi khởi tạo OCR: {e}")
             _ocr_reader = None
     return _ocr_reader
 
@@ -56,5 +56,5 @@ def extract_text(file_path: str) -> str:
             
         return " ".join(text_lines)
     except Exception as e:
-        print(f"      ❌ Lỗi OCR: {e}")
+        print(f"      [ERROR] Lỗi OCR: {e}")
         return f"[Lỗi OCR: {e}]"

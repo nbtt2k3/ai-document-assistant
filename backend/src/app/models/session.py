@@ -17,4 +17,4 @@ class Session(Base):
     created_at = Column(DateTime, default=datetime.utcnow)
 
     owner = relationship("User", back_populates="sessions")
-    messages = relationship("Message", back_populates="session", cascade="all, delete-orphan")
+    messages = relationship("Message", back_populates="session", cascade="all, delete-orphan", order_by="Message.created_at")

@@ -78,7 +78,61 @@ def get_session_messages(
     )
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-    return session.messages
+    from src.app.models.message import Message as DBMessage
+    messages = (
+        db.query(DBMessage)
+        .filter(DBMessage.session_id == session_id)
+        .order_by(DBMessage.created_at.asc(), DBMessage.id.asc())
+        .all()
+    )
+    return messages
+
+
+@router.get("/{session_id}/toc")
+def get_table_of_contents(
+    session_id: str,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    session = (
+        db.query(DBSession)
+        .filter(DBSession.id == session_id, DBSession.user_id == user_id)
+        .first()
+    )
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+        
+    from src.app.rag.vectorstore import _get_chroma_db
+    chroma = _get_chroma_db()
+    
+    try:
+        results = chroma.get(where={"session_id": session_id}, include=["metadatas"])
+        metadatas = results.get("metadatas", [])
+        
+        # Sắp xếp theo source (tên file) và chunk_index để giữ đúng thứ tự, không bị đan xen nếu có nhiều file
+        sorted_metas = sorted(metadatas, key=lambda x: (x.get("source", ""), x.get("chunk_index", 0)))
+        
+        toc = []
+        seen = set()
+        
+        for meta in sorted_metas:
+            h1 = meta.get("Header 1")
+            h2 = meta.get("Header 2")
+            h3 = meta.get("Header 3")
+            
+            if h1 and h1 not in seen:
+                toc.append({"level": 1, "title": h1})
+                seen.add(h1)
+            if h2 and h2 not in seen:
+                toc.append({"level": 2, "title": h2})
+                seen.add(h2)
+            if h3 and h3 not in seen:
+                toc.append({"level": 3, "title": h3})
+                seen.add(h3)
+                
+        return {"toc": toc}
+    except Exception as e:
+        return {"toc": [], "error": str(e)}
 
 
 @router.post("/{session_id}/upload")

@@ -74,9 +74,9 @@ def clean_output(text: str) -> str:
 
 # ── Prompt template ───────────────────────────────────────────────────────────
 
-_RAG_PROMPT_TEMPLATE = """Bạn là một trợ lý AI thông minh, thân thiện và hữu ích (có phong cách trò chuyện tự nhiên giống ChatGPT). KHÔNG ĐƯỢC dùng Tiếng Trung.
+_RAG_PROMPT_TEMPLATE = """Bạn là một trợ lý AI thông minh, thân thiện và hữu ích (có phong cách trò chuyện tự nhiên, nhiệt tình giống như một chuyên gia). 
 
-TÀI LIỆU CUNG CẤP:
+TÀI LIỆU CUNG CẤP (Ngữ cảnh):
 {context}
 
 LỊCH SỬ CHAT:
@@ -85,9 +85,17 @@ LỊCH SỬ CHAT:
 CÂU HỎI CỦA NGƯỜI DÙNG: {question}
 
 QUY TẮC PHẢN HỒI:
-1. Hãy trả lời câu hỏi một cách tự nhiên, rõ ràng, trực tiếp và lịch sự dựa trên TÀI LIỆU CUNG CẤP.
-2. Nếu câu hỏi có lệnh "trả lời bằng ngôn ngữ của tài liệu", hãy tự nhận diện tài liệu là Tiếng Anh hay Tiếng Việt và TRẢ LỜI BẰNG NGÔN NGỮ CỦA TÀI LIỆU ĐÓ. Trừ trường hợp này, hãy luôn trả lời bằng cùng ngôn ngữ với CÂU HỎI (Hỏi tiếng Việt -> Trả lời tiếng Việt).
-3. BẮT BUỘC chèn 3 câu hỏi gợi ý ở cuối cùng theo ĐÚNG định dạng thẻ [SUGGESTIONS] bên dưới.
+1. TRƯỜNG HỢP NGƯỜI DÙNG VỪA TẢI FILE LÊN (Câu hỏi chứa cụm "[SYSTEM] File"): 
+   - Hãy mở đầu bằng câu chào thân thiện thông báo đã nhận file, sau đó tự động tóm tắt ngắn gọn và mạch lạc nội dung chính của TÀI LIỆU CUNG CẤP để người dùng nắm được tổng quan.
+2. TRƯỜNG HỢP CÂU HỎI BÌNH THƯỜNG:
+   - Luôn trả lời một cách tự nhiên, lịch sự, rõ ràng và chi tiết dựa trên TÀI LIỆU CUNG CẤP.
+   - Nếu câu hỏi không liên quan đến tài liệu hoặc không tìm thấy thông tin trong tài liệu, hãy thành thật trả lời lịch sự. Tuyệt đối KHÔNG tự bịa đặt thông tin.
+3. NGÔN NGỮ (QUAN TRỌNG NHẤT): 
+   - Ngôn ngữ phản hồi BẮT BUỘC phải theo ngôn ngữ hội thoại hiện tại của người dùng, KHÔNG phụ thuộc vào ngôn ngữ của tài liệu.
+   - Mặc định: Nếu đây là tin nhắn đầu tiên (chưa có lịch sử chat), LUÔN LUÔN phản hồi bằng Tiếng Việt.
+   - Ví dụ: Nếu người dùng đang chat bằng tiếng Việt, bạn phải tóm tắt file và trả lời câu hỏi bằng tiếng Việt, dù tài liệu tải lên là tiếng Anh hay tiếng Nhật. Nếu người dùng đổi sang chat tiếng Anh, bạn mới đổi sang trả lời tiếng Anh.
+   - KHÔNG dùng Tiếng Trung.
+4. GỢI Ý: BẮT BUỘC chèn 3 câu hỏi gợi ý liên quan đến tài liệu ở cuối cùng theo ĐÚNG định dạng thẻ [SUGGESTIONS] bên dưới. Đảm bảo ngôn ngữ của câu hỏi gợi ý CÙNG NGÔN NGỮ với câu trả lời của bạn.
 
 ĐỊNH DẠNG ĐẦU RA BẮT BUỘC:
 (Nội dung câu trả lời tự nhiên của bạn...)
@@ -115,23 +123,29 @@ class SessionBM25Retriever(BaseRetriever):
 
 # ── RAG Chain factory ─────────────────────────────────────────────────────────
 
-def create_rag_chain_for_session(session_id: str):
+def create_rag_chain_for_session(session_id: str, section_title: str = None, level: int = None):
     """Tạo Hybrid RAG chain (BM25 + Vector + LLM) riêng cho một session."""
 
-    # 1. Vector retriever (Chroma, filter theo session_id)
-    vector_retriever = get_retriever_for_session(session_id)
+    if section_title and level:
+        from src.app.rag.vectorstore import get_retriever_for_section
+        # Chỉ dùng vector retriever để lấy toàn bộ chunk của mục này
+        retriever = get_retriever_for_section(session_id, section_title, level)
+    else:
+        # 1. Vector retriever (Chroma, filter theo session_id)
+        vector_retriever = get_retriever_for_session(session_id)
 
-    # 2. BM25 retriever (RAM-based, per-session)
-    bm25_retriever = SessionBM25Retriever(session_id=session_id)
+        # 2. BM25 retriever (RAM-based, per-session)
+        bm25_retriever = SessionBM25Retriever(session_id=session_id)
 
-    # 3. Hybrid: 50% BM25 + 50% Vector
-    retriever = EnsembleRetriever(
-        retrievers=[bm25_retriever, vector_retriever],
-        weights=[0.5, 0.5]
-    )
+        # 3. Hybrid: 50% BM25 + 50% Vector
+        retriever = EnsembleRetriever(
+            retrievers=[bm25_retriever, vector_retriever],
+            weights=[0.5, 0.5]
+        )
 
     # Chọn LLM dựa trên cấu hình API key
     if OPENAI_API_KEY:
+        print(f"[INFO] Dang su dung LLM Online: OpenAI ({OPENAI_LLM_MODEL})")
         llm = ChatOpenAI(
             model=OPENAI_LLM_MODEL,
             api_key=OPENAI_API_KEY,
@@ -139,6 +153,7 @@ def create_rag_chain_for_session(session_id: str):
             stop=_STOP_SEQUENCES,
         )
     elif GEMINI_API_KEY:
+        print(f"[INFO] Dang su dung LLM Online: Gemini ({GEMINI_LLM_MODEL})")
         llm = ChatGoogleGenerativeAI(
             model=GEMINI_LLM_MODEL,
             google_api_key=GEMINI_API_KEY,
@@ -146,6 +161,7 @@ def create_rag_chain_for_session(session_id: str):
             stop=_STOP_SEQUENCES,
         )
     else:
+        print(f"[INFO] Dang su dung LLM Local: Ollama ({LLM_MODEL})")
         llm = OllamaLLM(
             model=LLM_MODEL,
             temperature=0.0,

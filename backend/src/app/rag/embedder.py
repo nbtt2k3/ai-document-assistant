@@ -27,17 +27,20 @@ def get_embedder():
         return _embedder
 
     if OPENAI_API_KEY:
+        print(f"[INFO] Dang su dung Embedder Online: OpenAI ({OPENAI_EMBEDDING_MODEL})")
         _embedder = OpenAIEmbeddings(
             model=OPENAI_EMBEDDING_MODEL,
             api_key=OPENAI_API_KEY
         )
     elif GEMINI_API_KEY:
+        print(f"[INFO] Dang su dung Embedder Online: Gemini ({GEMINI_EMBEDDING_MODEL})")
         _embedder = GoogleGenerativeAIEmbeddings(
             model=f"models/{GEMINI_EMBEDDING_MODEL}",
             google_api_key=GEMINI_API_KEY
         )
     else:
         # Fallback to local Ollama
+        print(f"[INFO] Dang su dung Embedder Local: Ollama ({EMBEDDING_MODEL})")
         _embedder = OllamaEmbeddings(model=EMBEDDING_MODEL)
 
     return _embedder

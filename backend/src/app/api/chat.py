@@ -7,7 +7,7 @@ from src.app.db.database import get_db
 from src.app.models.session import Session as DBSession
 from src.app.models.message import Message as DBMessage
 from src.app.core.security import get_current_user_id
-from src.app.schemas.chat import ChatRequest
+from src.app.schemas.chat import ChatRequest, SummarizeSectionRequest
 from src.app.services.chat_service import build_history_text, create_event_stream
 
 router = APIRouter(prefix="/api/sessions", tags=["Chat"])
@@ -41,6 +41,9 @@ async def chat_endpoint(
         db.add(user_msg)
         db.commit()
 
+    from datetime import datetime
+    bot_start_time = datetime.utcnow()
+
     # 3. Lấy lịch sử hội thoại (delegate format cho chat_service)
     history_msgs = (
         db.query(DBMessage)
@@ -62,7 +65,8 @@ async def chat_endpoint(
                         bot_msg = DBMessage(
                             session_id=session_id, 
                             role="bot", 
-                            content=data["content"]
+                            content=data["content"],
+                            created_at=bot_start_time
                         )
                         db.add(bot_msg)
                         db.commit()
@@ -70,6 +74,41 @@ async def chat_endpoint(
                     print(f"Error saving answer: {e}")
                 continue  # Bỏ qua không gửi event này về frontend
 
+            yield sse_string
+
+    return StreamingResponse(wrapped_stream(), media_type="text/event-stream")
+
+
+@router.post("/{session_id}/summarize_section")
+async def summarize_section_endpoint(
+    session_id: str,
+    request: SummarizeSectionRequest,
+    db: Session = Depends(get_db),
+    user_id: int = Depends(get_current_user_id),
+):
+    # 1. Validate session
+    session = (
+        db.query(DBSession)
+        .filter(DBSession.id == session_id, DBSession.user_id == user_id)
+        .first()
+    )
+    if not session:
+        raise HTTPException(status_code=404, detail="Session not found")
+
+    # 2. Xây dựng câu hỏi ảo
+    actual_question = f"Hãy tóm tắt chi tiết toàn bộ nội dung của phần/chương có tên là: '{request.section_title}'."
+
+    # 3. Stream wrapper
+    async def wrapped_stream():
+        async for sse_string in create_event_stream(
+            session_id=session_id, 
+            question=actual_question, 
+            history_text="", 
+            section_title=request.section_title, 
+            level=request.level
+        ):
+            if '"_save_answer"' in sse_string:
+                continue  # Không cần lưu DB nội dung tóm tắt tự động, hoặc lưu tuỳ ý
             yield sse_string
 
     return StreamingResponse(wrapped_stream(), media_type="text/event-stream")
