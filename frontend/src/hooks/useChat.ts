@@ -181,93 +181,6 @@ export function useChat(activeSessionId: string | null) {
     }
   };
 
-  // Gửi yêu cầu tóm tắt mục/chương
-  const summarizeSection = async (sectionTitle: string, level: number) => {
-    if (!activeSessionId || isStreaming) return;
-
-    setMessages((prev) => [...prev, { role: 'user', content: `Hãy tóm tắt phần: **${sectionTitle}**` }]);
-    setIsStreaming(true);
-
-    try {
-      const token = getAuthToken();
-      const response = await fetch(`${API_BASE}/sessions/${activeSessionId}/summarize_section`, {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-          Authorization: `Bearer ${token}`,
-        },
-        body: JSON.stringify({ section_title: sectionTitle, level }),
-      });
-
-      if (!response.ok) throw new Error('API Error');
-      if (!response.body) throw new Error('No body');
-
-      const reader = response.body.getReader();
-      const decoder = new TextDecoder('utf-8');
-
-      let botResponse = '';
-      let buffer = '';
-      setMessages((prev) => [
-        ...prev,
-        { role: 'bot', content: '', isThinking: true },
-      ]);
-
-      while (true) {
-        const { value, done } = await reader.read();
-        if (done) break;
-
-        buffer += decoder.decode(value, { stream: true });
-
-        let boundary = buffer.indexOf('\n\n');
-        while (boundary !== -1) {
-          const chunkStr = buffer.slice(0, boundary);
-          buffer = buffer.slice(boundary + 2);
-
-          if (chunkStr.startsWith('data: ')) {
-            const dataStr = chunkStr.slice(6);
-            if (dataStr === '[DONE]') break;
-
-            try {
-              const parsed = JSON.parse(dataStr);
-              if (parsed.type === 'chunk' || parsed.type === 'final_answer') {
-                botResponse =
-                  parsed.type === 'chunk' ? botResponse + parsed.content : parsed.content;
-
-                const { content, suggestions } = parseBotMessage(botResponse);
-                setMessages((prev) => {
-                  const updated = [...prev];
-                  for (let i = updated.length - 1; i >= 0; i--) {
-                    if (updated[i].role === 'bot') {
-                      updated[i] = {
-                        ...updated[i],
-                        content,
-                        suggestions,
-                        isThinking: content.trim() === '' && parsed.type !== 'final_answer',
-                      };
-                      break;
-                    }
-                  }
-                  return updated;
-                });
-              }
-            } catch (err) {
-              console.error('Parse error', err, dataStr);
-            }
-          }
-          boundary = buffer.indexOf('\n\n');
-        }
-      }
-    } catch (err) {
-      console.error(err);
-      setMessages((prev) => [
-        ...prev,
-        { role: 'bot', content: 'Có lỗi xảy ra khi yêu cầu tóm tắt.' },
-      ]);
-    } finally {
-      setIsStreaming(false);
-    }
-  };
-
   const clearMessages = () => setMessages([]);
 
   return {
@@ -277,7 +190,6 @@ export function useChat(activeSessionId: string | null) {
     loadMessages,
     uploadFile,
     sendQuery,
-    summarizeSection,
     clearMessages,
   };
 }

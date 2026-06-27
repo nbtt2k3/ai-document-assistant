@@ -28,25 +28,23 @@ class CustomPDFLoader:
         self.file_path = file_path
 
     def load(self) -> list[Document]:
-        import pymupdf4llm
         import fitz
-        from langchain_text_splitters import MarkdownHeaderTextSplitter
+        from langchain_core.documents import Document
         
         docs = []
         try:
-            # 1. Trích xuất markdown (Ưu tiên pymupdf4llm để lấy Mục lục chuẩn)
+            # Trích xuất markdown (Sử dụng MarkItDown để lấy nội dung chuẩn)
             try:
-                import pymupdf4llm
-                md_pages = pymupdf4llm.to_markdown(self.file_path, page_chunks=True)
-                combined_md = ""
-                for page in md_pages:
-                    combined_md += page["text"] + "\n\n"
-            except Exception:
-                # Lỗi ONNX xảy ra, âm thầm fallback sang MarkItDown (không in lỗi rác ra màn hình)
                 from markitdown import MarkItDown
                 md = MarkItDown()
                 result = md.convert(self.file_path)
                 combined_md = result.text_content
+            except Exception as e:
+                combined_md = ""
+                doc_fitz = fitz.open(self.file_path)
+                for page in doc_fitz:
+                    combined_md += page.get_text() + "\n\n"
+                doc_fitz.close()
                 
             doc_fitz = fitz.open(self.file_path)
 
@@ -71,11 +69,9 @@ class CustomPDFLoader:
                             img_pil.save(tmp, format="PNG")
                             tmp_path = tmp.name
                     except Exception as e:
-                        print(f"  [ERROR] Lỗi convert ảnh {img_index+1} sang PNG: {e}")
                         continue
 
                     try:
-                        print(f"  [INFO] Ảnh {img_index+1} — trang {page_num+1} ({os.path.basename(self.file_path)})")
                         img_docs = ImageOCRLoader(tmp_path).load()
                         if img_docs:
                             img_contents.append(img_docs[0].page_content)
@@ -85,18 +81,7 @@ class CustomPDFLoader:
             if img_contents:
                 combined_md += "\n\n=== NỘI DUNG ẢNH TRONG TÀI LIỆU ===\n" + "\n\n".join(img_contents)
 
-            # 2. Cắt văn bản dựa trên Header (Chương/Mục)
-            headers_to_split_on = [
-                ("#", "Header 1"),
-                ("##", "Header 2"),
-                ("###", "Header 3"),
-            ]
-            markdown_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on)
-            md_header_splits = markdown_splitter.split_text(combined_md)
-            
-            for split in md_header_splits:
-                split.metadata["source"] = self.file_path
-                docs.append(split)
+            docs.append(Document(page_content=combined_md, metadata={"source": self.file_path}))
 
         except Exception as e:
             print(f"  [ERROR] Lỗi đọc PDF: {e}")

@@ -6,7 +6,7 @@ Một hệ thống trợ lý ảo AI (Retrieval-Augmented Generation - RAG) toà
 - **Bảo mật người dùng:** Tích hợp tính năng Đăng nhập/Đăng ký với JWT Token, mỗi người dùng có không gian lưu trữ và lịch sử chat riêng biệt.
 - **Quản lý Phiên (Sessions):** Lưu trữ toàn bộ lịch sử các cuộc trò chuyện và tài liệu vào cơ sở dữ liệu PostgreSQL.
 - **RAG Nâng cao (Hybrid Retrieval):** Kết hợp cả tìm kiếm theo từ khóa (BM25) và tìm kiếm ngữ nghĩa (ChromaDB Vector Store) để cho ra kết quả chính xác nhất.
-- **Trích xuất thông minh (OCR):** Tích hợp công nghệ PaddleOCR giúp đọc và trích xuất chữ từ cả các tệp PDF dạng scan hoặc hình ảnh.
+- **Trích xuất siêu tốc & OCR:** Sử dụng **MarkItDown** để bóc tách văn bản chuẩn xác không lo lỗi vặt, kết hợp công nghệ **PaddleOCR** xử lý mượt mà cả các tệp PDF dạng scan hoặc hình ảnh.
 - **Linh hoạt Mô hình AI:**
   - **Local (Riêng tư 100%):** Hỗ trợ chạy các LLM mã nguồn mở qua Ollama (Qwen, Llama).
   - **Online (Siêu tốc):** Hỗ trợ kết nối các API mạnh mẽ của ChatGPT (OpenAI) và Gemini (Google).

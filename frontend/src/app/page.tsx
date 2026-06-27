@@ -35,7 +35,6 @@ export default function ChatPage() {
     loadMessages,
     uploadFile,
     sendQuery,
-    summarizeSection,
     clearMessages,
   } = useChat(activeSessionId);
 
@@ -47,14 +46,16 @@ export default function ChatPage() {
       return;
     }
     loadSessions();
-  }, [router, loadSessions]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [router]);
 
   // Load messages khi chuyển session
   useEffect(() => {
     if (activeSessionId) {
       loadMessages(activeSessionId);
     }
-  }, [activeSessionId, loadMessages]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [activeSessionId]);
 
   const handleLogout = () => {
     removeAuthToken();
@@ -154,7 +155,6 @@ export default function ChatPage() {
               messages={messages}
               isStreaming={isStreaming}
               onSuggestionClick={handleSendQuery}
-              onSummarizeSection={summarizeSection}
             />
             <InputBar
               isStreaming={isStreaming}
