@@ -35,16 +35,21 @@ STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 (STORAGE_DIR / "chroma_db").mkdir(parents=True, exist_ok=True)
 
 # ── API Keys ──────────────────────────────────────────────────────────────────
-# Ưu tiên theo thứ tự: OpenAI → Gemini → Local (Ollama)
+# Ưu tiên theo thứ tự: GitHub → OpenRouter → Grok (xAI) → OpenAI → Gemini → Local
+GITHUB_TOKEN       = os.environ.get("GITHUB_TOKEN", "")
+OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
+XAI_API_KEY = os.environ.get("XAI_API_KEY", "")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
 # ── Online Model Names ────────────────────────────────────────────────────────
+GITHUB_LLM_MODEL       = os.environ.get("GITHUB_LLM_MODEL", "gpt-4o")
+OPENROUTER_LLM_MODEL   = os.environ.get("OPENROUTER_LLM_MODEL", "qwen/qwen3-coder:free")
+XAI_LLM_MODEL          = os.environ.get("XAI_LLM_MODEL", "grok-beta")
+
 OPENAI_LLM_MODEL       = os.environ.get("OPENAI_LLM_MODEL", "gpt-4o-mini")
-OPENAI_EMBEDDING_MODEL  = os.environ.get("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
 
 GEMINI_LLM_MODEL       = os.environ.get("GEMINI_LLM_MODEL", "gemini-2.5-flash")
-GEMINI_EMBEDDING_MODEL  = os.environ.get("GEMINI_EMBEDDING_MODEL", "gemini-embedding-2")
 
 # ── Local Model Names (Ollama) ────────────────────────────────────────────────
 # HƯỚNG DẪN CHỌN MODEL CHO CẤU HÌNH MÁY (Sử dụng Ollama Local - mặc định khi không có API Key):

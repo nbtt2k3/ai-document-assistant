@@ -14,7 +14,7 @@ except Exception as e:
     print(f"[WARNING] Không thể kết nối DB để tạo bảng: {e}")
     print("[WARNING] Hãy đảm bảo PostgreSQL đang chạy và DATABASE_URL trong .env là đúng.")
 
-app = FastAPI(title="Pro RAG Chatbot API")
+app = FastAPI(title="AI Document Assistant API")
 
 app.add_middleware(
     CORSMiddleware,
@@ -30,7 +30,7 @@ app.include_router(chat.router)
 
 @app.get("/")
 def root():
-    return {"message": "Welcome to Pro RAG Chatbot API"}
+    return {"message": "Welcome to AI Document Assistant API"}
 
 if __name__ == "__main__":
     uvicorn.run("src.app.main:app", host="127.0.0.1", port=8000, reload=True)

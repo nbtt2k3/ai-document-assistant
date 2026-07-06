@@ -1,11 +1,11 @@
 import httpx
-from fastapi import APIRouter, Depends, HTTPException
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 import json
 import os
 
-from src.app.db.database import get_db
+from src.app.db.database import get_db, SessionLocal
 from src.app.models.session import Session as DBSession
 from src.app.models.message import Message as DBMessage
 from src.app.core.security import get_current_user_id
@@ -26,11 +26,49 @@ def build_history_text(messages: list) -> str:
     lines.append("")
     return "\n".join(lines) + "\n"
 
+async def summarize_memory_task(session_id: str):
+    """Background task: tự động tóm tắt tin nhắn cũ nếu quá dài."""
+    db = SessionLocal()
+    try:
+        session = db.query(DBSession).filter(DBSession.id == session_id).first()
+        if not session:
+            return
+
+        unsummarized_msgs = (
+            db.query(DBMessage)
+            .filter(DBMessage.session_id == session_id, DBMessage.is_summarized == False)
+            .order_by(DBMessage.created_at.asc())
+            .all()
+        )
+
+        # Nếu có hơn 6 tin nhắn chưa tóm tắt (tương đương 3 lượt hỏi-đáp)
+        if len(unsummarized_msgs) > 6:
+            new_messages_text = build_history_text(unsummarized_msgs)
+            payload = {
+                "old_summary": session.summary or "",
+                "new_messages": new_messages_text
+            }
+            async with httpx.AsyncClient(timeout=None) as client:
+                resp = await client.post(f"{AI_AGENT_URL}/internal/summarize_memory", json=payload)
+                if resp.status_code == 200:
+                    data = resp.json()
+                    if "new_summary" in data:
+                        session.summary = data["new_summary"]
+                        for msg in unsummarized_msgs:
+                            msg.is_summarized = True
+                        db.commit()
+                        print(f"[Memory] Đã tóm tắt session {session_id}")
+    except Exception as e:
+        print(f"[Memory] Error in summarize_memory_task: {e}")
+    finally:
+        db.close()
+
 
 @router.post("/{session_id}/chat")
 async def chat_endpoint(
     session_id: str,
     request: ChatRequest,
+    background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
@@ -56,13 +94,23 @@ async def chat_endpoint(
     from datetime import datetime
     bot_start_time = datetime.utcnow()
 
-    history_msgs = (
+    unsummarized_msgs = (
         db.query(DBMessage)
-        .filter(DBMessage.session_id == session_id)
+        .filter(DBMessage.session_id == session_id, DBMessage.is_summarized == False)
         .order_by(DBMessage.created_at.asc())
-        .all()[-10:]
+        .all()
     )
-    history_text = build_history_text(history_msgs[:-1])
+    
+    past_unsummarized = unsummarized_msgs[:-1] if unsummarized_msgs else []
+    
+    history_text = ""
+    if session.summary:
+        history_text += f"TÓM TẮT LỊCH SỬ CHAT CŨ:\n{session.summary}\n\n"
+    
+    history_text += build_history_text(past_unsummarized)
+
+    # Lên lịch chạy ngầm task tóm tắt sau khi luồng này trả về kết quả cho user
+    background_tasks.add_task(summarize_memory_task, session_id)
 
     async def wrapped_stream():
         payload = {
@@ -70,7 +118,7 @@ async def chat_endpoint(
             "question": actual_question,
             "history_text": history_text
         }
-        async with httpx.AsyncClient(timeout=300.0) as client:
+        async with httpx.AsyncClient(timeout=None) as client:
             async with client.stream("POST", f"{AI_AGENT_URL}/internal/chat", json=payload) as response:
                 async for chunk in response.aiter_lines():
                     if chunk:
@@ -122,7 +170,7 @@ async def summarize_section_endpoint(
             "section_title": request.section_title,
             "level": request.level
         }
-        async with httpx.AsyncClient(timeout=300.0) as client:
+        async with httpx.AsyncClient(timeout=None) as client:
             async with client.stream("POST", f"{AI_AGENT_URL}/internal/chat", json=payload) as response:
                 async for chunk in response.aiter_lines():
                     if chunk:

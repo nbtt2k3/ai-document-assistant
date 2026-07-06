@@ -101,3 +101,19 @@ async def create_event_stream(
         yield f"data: {error_data}\n\n"
     finally:
         yield "data: [DONE]\n\n"
+
+
+def summarize_memory(old_summary: str, new_messages: str) -> str:
+    """Tóm tắt lịch sử hội thoại cũ và mới thành một bản tóm tắt duy nhất."""
+    from src.app.rag.llm_factory import get_llm
+    from src.app.rag.prompts import MEMORY_SUMMARY_PROMPT_TEMPLATE
+    from langchain_core.prompts import ChatPromptTemplate
+    from langchain_core.output_parsers import StrOutputParser
+
+    prompt = ChatPromptTemplate.from_template(MEMORY_SUMMARY_PROMPT_TEMPLATE)
+    chain = prompt | get_llm() | StrOutputParser()
+    
+    return chain.invoke({
+        "old_summary": old_summary or "Không có tóm tắt cũ.",
+        "new_messages": new_messages or "Không có tin nhắn mới."
+    })

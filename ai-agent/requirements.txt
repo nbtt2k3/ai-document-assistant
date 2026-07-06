@@ -5,10 +5,11 @@ langchain-chroma==0.1.4
 langchain-ollama==0.2.1
 langchain-openai==0.2.12
 langchain-google-genai==2.0.6
+langchain-xai
 # Document loaders & text splitter
 pymupdf4llm==1.27.2.3
-markitdown==0.1.6
-mammoth==1.12.0
+markitdown[all]==0.1.6
+mammoth==1.11.0
 docx2txt==0.9
 
 # OCR
@@ -18,6 +19,7 @@ paddleocr==3.7.0
 # Vector database & Search
 chromadb==0.5.23
 rank_bm25==0.2.2
+flashrank
 
 # Environment & utilities
 python-dotenv==1.0.1

@@ -12,7 +12,9 @@ Các thành phần được import từ:
 from operator import itemgetter
 from typing import List
 
-from langchain.retrievers import EnsembleRetriever
+from langchain.retrievers import EnsembleRetriever, ContextualCompressionRetriever
+from langchain.retrievers.multi_query import MultiQueryRetriever
+from langchain_community.document_compressors.flashrank_rerank import FlashrankRerank
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.documents import Document
@@ -24,7 +26,8 @@ from src.app.rag.prompts import (
     CHITCHAT_PROMPT_TEMPLATE,
     SUMMARIZE_PROMPT_TEMPLATE,
     TRANSLATE_PROMPT_TEMPLATE,
-    RAG_PROMPT_TEMPLATE,
+    RAG_SYSTEM_PROMPT,
+    RAG_HUMAN_PROMPT,
 )
 from src.app.rag.llm_factory import get_llm
 from src.app.rag.utils import format_docs
@@ -47,6 +50,9 @@ class SessionBM25Retriever(BaseRetriever):
 def create_rag_chain_for_session(session_id: str, section_title: str = None, level: int = None):
     """Tạo Hybrid RAG chain (BM25 + Vector + LLM) riêng cho một session."""
 
+    # Lấy LLM từ factory
+    llm = get_llm()
+
     if section_title and level:
         from src.app.rag.vectorstore import get_retriever_for_section
         # Chỉ dùng vector retriever để lấy toàn bộ chunk của mục này
@@ -59,20 +65,32 @@ def create_rag_chain_for_session(session_id: str, section_title: str = None, lev
         bm25_retriever = SessionBM25Retriever(session_id=session_id)
 
         # 3. Hybrid: 50% BM25 + 50% Vector
-        retriever = EnsembleRetriever(
+        base_retriever = EnsembleRetriever(
             retrievers=[bm25_retriever, vector_retriever],
             weights=[0.5, 0.5]
         )
 
-    # Lấy LLM từ factory
-    llm = get_llm()
+        # 4. Multi-Query: Tự động sinh câu hỏi đồng nghĩa
+        mq_retriever = MultiQueryRetriever.from_llm(
+            retriever=base_retriever, llm=llm
+        )
+
+        # 5. Re-ranking: Chấm điểm và lọc top 3 kết quả xuất sắc nhất
+        compressor = FlashrankRerank()
+        retriever = ContextualCompressionRetriever(
+            base_compressor=compressor, base_retriever=mq_retriever
+        )
 
     # Tạo prompt objects
     router_prompt = ChatPromptTemplate.from_template(ROUTER_PROMPT_TEMPLATE)
     chitchat_prompt = ChatPromptTemplate.from_template(CHITCHAT_PROMPT_TEMPLATE)
     summarize_prompt = ChatPromptTemplate.from_template(SUMMARIZE_PROMPT_TEMPLATE)
     translate_prompt = ChatPromptTemplate.from_template(TRANSLATE_PROMPT_TEMPLATE)
-    rag_prompt = ChatPromptTemplate.from_template(RAG_PROMPT_TEMPLATE)
+    
+    rag_prompt = ChatPromptTemplate.from_messages([
+        ("system", RAG_SYSTEM_PROMPT),
+        ("human", RAG_HUMAN_PROMPT)
+    ])
 
     # Router Chain (Output is a single word: RAG, CHITCHAT, SUMMARIZE, TRANSLATE)
     router_chain = router_prompt | llm | StrOutputParser() | (lambda x: x.strip().upper())

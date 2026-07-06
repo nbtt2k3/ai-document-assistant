@@ -1,7 +1,7 @@
 """
 models/message.py — SQLAlchemy model cho bảng messages.
 """
-from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime
+from sqlalchemy import Column, Integer, String, Text, ForeignKey, DateTime, Boolean
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -15,6 +15,7 @@ class Message(Base):
     session_id = Column(String, ForeignKey("sessions.id"))
     role = Column(String(20), nullable=False)  # "user" hoặc "bot"
     content = Column(Text, nullable=False)
+    is_summarized = Column(Boolean, default=False)
     created_at = Column(DateTime, default=datetime.utcnow)
 
     session = relationship("Session", back_populates="messages")

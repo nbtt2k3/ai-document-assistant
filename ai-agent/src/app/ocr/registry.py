@@ -8,13 +8,15 @@ from langchain_community.document_loaders import TextLoader
 
 from src.app.ocr.pdf_reader import CustomPDFLoader
 from src.app.ocr.docx_reader import CustomDocxLoader
+from src.app.ocr.markitdown_reader import MarkItDownLoader
 
 
-# Mapping: đuôi file → loader class
 FILE_LOADERS: dict = {
     ".pdf":  CustomPDFLoader,
     ".txt":  TextLoader,
     ".docx": CustomDocxLoader,
+    ".xlsx": MarkItDownLoader,
+    ".csv":  MarkItDownLoader,
 }
 
 SUPPORTED_EXTENSIONS = set(FILE_LOADERS.keys())

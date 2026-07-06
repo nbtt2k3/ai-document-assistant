@@ -58,7 +58,7 @@ export default function InputBar({
           type="file"
           ref={fileInputRef}
           style={{ display: 'none' }}
-          accept=".pdf,.docx,.txt"
+          accept=".pdf,.docx,.txt,.xlsx,.csv"
           onChange={handleFileChange}
         />
 

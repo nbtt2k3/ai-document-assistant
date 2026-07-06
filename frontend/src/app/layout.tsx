@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import "./globals.css";
 
 export const metadata: Metadata = {
-  title: "Pro RAG Chatbot",
+  title: "AI Document Assistant",
   description: "Advanced RAG Chatbot with Document Isolation",
 };
 

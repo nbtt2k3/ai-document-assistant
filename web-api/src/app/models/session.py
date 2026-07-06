@@ -1,7 +1,7 @@
 """
 models/session.py — SQLAlchemy model cho bảng sessions.
 """
-from sqlalchemy import Column, String, Integer, ForeignKey, DateTime
+from sqlalchemy import Column, String, Integer, ForeignKey, DateTime, Text
 from sqlalchemy.orm import relationship
 from datetime import datetime
 
@@ -14,6 +14,7 @@ class Session(Base):
     id = Column(String, primary_key=True, index=True)  # UUID
     user_id = Column(Integer, ForeignKey("users.id"))
     title = Column(String, default="New Chat")
+    summary = Column(Text, default="")
     created_at = Column(DateTime, default=datetime.utcnow)
 
     owner = relationship("User", back_populates="sessions")

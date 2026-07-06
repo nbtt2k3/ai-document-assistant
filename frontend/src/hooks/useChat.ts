@@ -10,12 +10,47 @@ const API_BASE = 'http://127.0.0.1:8000/api';
 export function parseBotMessage(rawContent: string): ParsedBotMessage {
   let displayContent = rawContent;
   let suggestions: string[] = [];
+  
+  // 1. Thử tìm thẻ [SUGGESTIONS]
   const suggestMatch = rawContent.match(/\[SUGGESTIONS\]([^\n]*)/i);
   if (suggestMatch) {
     displayContent = rawContent.replace(suggestMatch[0], '').trim();
-    // Tách và dọn dẹp các câu hỏi
     const rawText = suggestMatch[1].replace(/\d+\.\s/g, '|').replace(/"/g, '');
     suggestions = rawText.split('|').map((s) => s.trim()).filter((s) => s.length > 5 && s.includes('?'));
+  } else {
+    // 2. Fallback: Bắt các danh sách 1. 2. 3. hoặc gạch đầu dòng ở phần cuối của tin nhắn
+    const lines = rawContent.split('\n');
+    const potentialSuggestions = [];
+    let stopIndex = lines.length - 1;
+
+    while (stopIndex >= 0) {
+      const line = lines[stopIndex].trim();
+      if (!line) {
+        stopIndex--;
+        continue;
+      }
+      
+      // Match "1. Câu hỏi?" hoặc "- Câu hỏi?" hoặc "* Câu hỏi?"
+      const listMatch = line.match(/^(\d+[\.\)]|\-|\*)\s+(.*?\?.*)$/);
+      if (listMatch) {
+        potentialSuggestions.unshift(listMatch[2].trim());
+        stopIndex--;
+      } else {
+        break;
+      }
+    }
+
+    // Nếu tìm thấy từ 2 câu hỏi trở lên ở cuối bài, coi đó là suggestions
+    if (potentialSuggestions.length >= 2) {
+      suggestions = potentialSuggestions;
+      displayContent = lines.slice(0, stopIndex + 1).join('\n').trim();
+      
+      // Cắt luôn câu dẫn dư thừa như "Here are three questions:"
+      const lastLine = displayContent.split('\n').pop()?.trim().toLowerCase() || "";
+      if (lastLine.includes("question") || lastLine.includes("câu hỏi") || lastLine.includes("gợi ý") || lastLine.includes("explore further")) {
+         displayContent = displayContent.substring(0, displayContent.lastIndexOf('\n')).trim();
+      }
+    }
   }
 
   // Xóa ký tự '|' dư thừa ở cuối văn bản nếu có
