@@ -13,9 +13,9 @@ from pathlib import Path
 
 from langchain_core.documents import Document
 
-from src.app.core.config import DATA_PATH
-from src.app.ocr.pdf_reader import FILE_LOADERS, SUPPORTED_EXTENSIONS
-from src.app.rag.vectorstore import add_documents_to_session, remove_documents_for_session
+from src.app.config import DATA_PATH
+from src.app.ocr.registry import FILE_LOADERS, SUPPORTED_EXTENSIONS
+from src.app.rag.vectorstore import add_documents_to_session, remove_documents_for_session, get_session_metadatas
 from src.app.rag.bm25 import build_bm25_for_session, remove_bm25_for_session
 
 
@@ -89,3 +89,28 @@ def cleanup_session_data(session_id: str):
 
     # 3. BM25 RAM index
     remove_bm25_for_session(session_id)
+
+
+def get_toc_for_session(session_id: str) -> list[dict]:
+    """
+    Trích xuất Table of Contents từ metadata của các chunks trong session.
+
+    Returns:
+        Danh sách các mục lục, mỗi mục có 'level' (1-3) và 'title'.
+    """
+    metadatas = get_session_metadatas(session_id)
+    sorted_metas = sorted(
+        metadatas,
+        key=lambda x: (x.get("source", ""), x.get("chunk_index", 0))
+    )
+
+    toc = []
+    seen = set()
+    for meta in sorted_metas:
+        for level, header_key in [(1, "Header 1"), (2, "Header 2"), (3, "Header 3")]:
+            title = meta.get(header_key)
+            if title and title not in seen:
+                toc.append({"level": level, "title": title})
+                seen.add(title)
+
+    return toc

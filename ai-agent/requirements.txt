@@ -28,8 +28,5 @@ uvicorn
 pydantic
 
 # Database & Auth
-sqlalchemy
-psycopg2-binary
-passlib[bcrypt]
-python-jose[cryptography]
+# (Đã loại bỏ vì ai-agent không cần kết nối SQL hay Auth trực tiếp)
 python-multipart

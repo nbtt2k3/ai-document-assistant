@@ -11,7 +11,8 @@ import json
 import logging
 from typing import AsyncGenerator
 
-from src.app.rag.chain import create_rag_chain_for_session, get_last_sources, clean_output
+from src.app.rag.chain import create_rag_chain_for_session
+from src.app.rag.utils import get_last_sources, clean_output
 
 
 def build_history_text(messages: list) -> str:

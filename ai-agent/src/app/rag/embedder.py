@@ -1,7 +1,7 @@
 """
 rag/embedder.py — Embedding abstraction.
 
-Singleton OllamaEmbeddings. Đổi embedding provider chỉ cần sửa ở đây.
+Singleton embedding model. Đổi embedding provider chỉ cần sửa ở đây.
 
 Ví dụ đổi sang OpenAI:
     from langchain_openai import OpenAIEmbeddings
@@ -11,8 +11,8 @@ from langchain_ollama import OllamaEmbeddings
 from langchain_openai import OpenAIEmbeddings
 from langchain_google_genai import GoogleGenerativeAIEmbeddings
 
-from src.app.rag.config import (
-    EMBEDDING_MODEL,
+from src.app.config import (
+    EMBEDDING_MODEL, OLLAMA_BASE_URL,
     OPENAI_API_KEY, OPENAI_EMBEDDING_MODEL,
     GEMINI_API_KEY, GEMINI_EMBEDDING_MODEL
 )
@@ -41,6 +41,9 @@ def get_embedder():
     else:
         # Fallback to local Ollama
         print(f"[INFO] Dang su dung Embedder Local: Ollama ({EMBEDDING_MODEL})")
-        _embedder = OllamaEmbeddings(model=EMBEDDING_MODEL)
+        _embedder = OllamaEmbeddings(
+            model=EMBEDDING_MODEL, 
+            base_url=OLLAMA_BASE_URL
+        )
 
     return _embedder

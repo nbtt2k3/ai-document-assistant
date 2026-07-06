@@ -8,8 +8,7 @@ from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
 
-from src.app.core.config import VECTORSTORE_PATH
-from src.app.rag.config import CHUNK_SIZE, CHUNK_OVERLAP
+from src.app.config import VECTORSTORE_PATH, CHUNK_SIZE, CHUNK_OVERLAP
 from src.app.rag.embedder import get_embedder
 
 
@@ -79,6 +78,16 @@ def get_retriever_for_section(session_id: str, section_title: str, level: int):
             }
         }
     )
+
+
+def get_session_metadatas(session_id: str) -> list[dict]:
+    """Lấy tất cả metadatas của một session từ Chroma (cho TOC, v.v.)."""
+    db = _get_chroma_db()
+    try:
+        results = db.get(where={"session_id": session_id}, include=["metadatas"])
+        return results.get("metadatas", [])
+    except Exception:
+        return []
 
 
 def remove_documents_for_session(session_id: str):

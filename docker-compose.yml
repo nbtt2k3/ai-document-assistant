@@ -1,0 +1,45 @@
+version: '3.8'
+
+services:
+  web-api:
+    build: ./web-api
+    restart: always
+    ports:
+      - "8000:8000"
+    depends_on:
+      - db
+      - ai-agent
+    volumes:
+      - ./web-api:/app
+    environment:
+      - DATABASE_URL=postgresql://rag_user:rag_password@db:5432/rag_db
+      - SECRET_KEY=supper_secret_key_change_me_in_production
+      - AI_AGENT_URL=http://ai-agent:8001
+
+  ai-agent:
+    build: ./ai-agent
+    restart: always
+    ports:
+      - "8001:8001"
+    volumes:
+      - ./ai-agent:/app
+    environment:
+      # If using local ollama on host machine, we need to be able to reach host.
+      - OLLAMA_BASE_URL=http://host.docker.internal:11434
+    extra_hosts:
+      - "host.docker.internal:host-gateway"
+
+  db:
+    image: postgres:15
+    restart: always
+    environment:
+      POSTGRES_USER: rag_user
+      POSTGRES_PASSWORD: rag_password
+      POSTGRES_DB: rag_db
+    ports:
+      - "5433:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+
+volumes:
+  postgres_data:

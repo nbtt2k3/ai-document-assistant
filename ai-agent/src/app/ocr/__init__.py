@@ -5,8 +5,9 @@ Tách hoàn toàn khỏi RAG. Chịu trách nhiệm duy nhất:
 trích xuất văn bản từ file (ảnh, PDF, DOCX, TXT).
 
 Modules:
-- config.py       : Cấu hình OCR (engine, ngôn ngữ, GPU)
 - engine.py       : Singleton OCR reader + unified extract_text() interface
 - image_reader.py : Đọc ảnh PNG/JPG → Document
-- pdf_reader.py   : Đọc PDF/DOCX/TXT → list[Document]
+- pdf_reader.py   : Đọc PDF → list[Document]
+- docx_reader.py  : Đọc DOCX → list[Document]
+- registry.py     : FILE_LOADERS mapping (đuôi file → loader class)
 """

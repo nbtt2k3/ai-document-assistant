@@ -1,3 +1,5 @@
+import os
+import httpx
 from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
 from sqlalchemy.orm import Session
 import uuid
@@ -7,14 +9,10 @@ from src.app.db.database import get_db
 from src.app.models.session import Session as DBSession
 from src.app.core.security import get_current_user_id
 from src.app.schemas.session import SessionCreate, SessionUpdate, SessionResponse, MessageResponse
-from src.app.services.document_service import (
-    get_supported_extensions,
-    save_upload_file,
-    process_upload,
-    cleanup_session_data,
-)
 
 router = APIRouter(prefix="/api/sessions", tags=["Sessions"])
+
+AI_AGENT_URL = os.getenv("AI_AGENT_URL", "http://ai-agent:8001")
 
 
 @router.get("/", response_model=List[SessionResponse])
@@ -89,7 +87,7 @@ def get_session_messages(
 
 
 @router.get("/{session_id}/toc")
-def get_table_of_contents(
+async def get_table_of_contents(
     session_id: str,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
@@ -102,37 +100,13 @@ def get_table_of_contents(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
         
-    from src.app.rag.vectorstore import _get_chroma_db
-    chroma = _get_chroma_db()
-    
-    try:
-        results = chroma.get(where={"session_id": session_id}, include=["metadatas"])
-        metadatas = results.get("metadatas", [])
-        
-        # Sắp xếp theo source (tên file) và chunk_index để giữ đúng thứ tự, không bị đan xen nếu có nhiều file
-        sorted_metas = sorted(metadatas, key=lambda x: (x.get("source", ""), x.get("chunk_index", 0)))
-        
-        toc = []
-        seen = set()
-        
-        for meta in sorted_metas:
-            h1 = meta.get("Header 1")
-            h2 = meta.get("Header 2")
-            h3 = meta.get("Header 3")
-            
-            if h1 and h1 not in seen:
-                toc.append({"level": 1, "title": h1})
-                seen.add(h1)
-            if h2 and h2 not in seen:
-                toc.append({"level": 2, "title": h2})
-                seen.add(h2)
-            if h3 and h3 not in seen:
-                toc.append({"level": 3, "title": h3})
-                seen.add(h3)
-                
-        return {"toc": toc}
-    except Exception as e:
-        return {"toc": [], "error": str(e)}
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            response = await client.get(f"{AI_AGENT_URL}/internal/toc/{session_id}")
+            response.raise_for_status()
+            return response.json()
+        except Exception as e:
+            return {"toc": [], "error": str(e)}
 
 
 @router.post("/{session_id}/upload")
@@ -142,7 +116,6 @@ async def upload_file(
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
-    # 1. Validate session ownership
     session = (
         db.query(DBSession)
         .filter(DBSession.id == session_id, DBSession.user_id == user_id)
@@ -151,36 +124,36 @@ async def upload_file(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    # 2. Validate file extension
-    from pathlib import Path
-    ext = Path(file.filename).suffix.lower()
-    if ext not in get_supported_extensions():
-        raise HTTPException(
-            status_code=400,
-            detail=f"Định dạng '{ext}' không được hỗ trợ. "
-                   f"Hỗ trợ: {', '.join(sorted(get_supported_extensions()))}"
-        )
-
-    # 3. Lưu file + parse + index (delegate cho document_service)
     content = await file.read()
-    file_path = save_upload_file(session_id, file.filename, content)
 
-    try:
-        num_segments = process_upload(session_id, file_path, file.filename)
-        
-        # Lưu tin nhắn báo upload file vào DB để không bị mất khi reload
-        from src.app.models.message import Message as DBMessage
-        upload_msg = DBMessage(session_id=session_id, role="user", content=f"**{file.filename}**")
-        db.add(upload_msg)
-        db.commit()
-        
-        return {"message": f"Đã xử lý thành công {num_segments} đoạn từ {file.filename}"}
-    except Exception as e:
-        raise HTTPException(status_code=500, detail=f"Lỗi xử lý file: {str(e)}")
+    async with httpx.AsyncClient(timeout=300.0) as client:
+        try:
+            files = {"file": (file.filename, content, file.content_type)}
+            response = await client.post(
+                f"{AI_AGENT_URL}/internal/ingest/{session_id}",
+                files=files
+            )
+            
+            if response.status_code != 200:
+                raise HTTPException(status_code=response.status_code, detail=response.text)
+                
+            data = response.json()
+            num_segments = data.get("num_segments", 0)
+            
+            from src.app.models.message import Message as DBMessage
+            upload_msg = DBMessage(session_id=session_id, role="user", content=f"**{file.filename}**")
+            db.add(upload_msg)
+            db.commit()
+            
+            return {"message": f"Đã xử lý thành công {num_segments} đoạn từ {file.filename}"}
+        except HTTPException:
+            raise
+        except Exception as e:
+            raise HTTPException(status_code=500, detail=f"Lỗi xử lý file từ AI Agent: {str(e)}")
 
 
 @router.delete("/{session_id}")
-def delete_session(
+async def delete_session(
     session_id: str,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
@@ -193,10 +166,12 @@ def delete_session(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    # 1. Dọn dẹp file, vectorstore, BM25 (delegate cho document_service)
-    cleanup_session_data(session_id)
+    async with httpx.AsyncClient(timeout=30.0) as client:
+        try:
+            await client.delete(f"{AI_AGENT_URL}/internal/session/{session_id}")
+        except Exception as e:
+            print(f"[WARNING] Could not delete data in AI Agent: {e}")
 
-    # 2. Xoá session khỏi SQL (cascade xoá messages tự động)
     db.delete(session)
     db.commit()
 

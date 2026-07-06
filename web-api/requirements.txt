@@ -1,0 +1,15 @@
+# Environment & utilities
+python-dotenv==1.0.1
+httpx==0.27.0
+
+# API & Backend
+fastapi
+uvicorn
+pydantic
+
+# Database & Auth
+sqlalchemy
+psycopg2-binary
+passlib[bcrypt]
+python-jose[cryptography]
+python-multipart
