@@ -148,18 +148,20 @@ CÂU HỎI GỐC:
 Hãy viết lại câu hỏi tìm kiếm một cách ngắn gọn, súc tích và chứa nhiều từ khóa quan trọng. 
 TUYỆT ĐỐI KHÔNG giải thích, KHÔNG trả lời câu hỏi, CHỈ in ra đúng 1 câu truy vấn mới:"""
 
-# ── Suggestions Prompt ────────────────────────────────────────────────────────
-
 SUGGESTIONS_PROMPT_TEMPLATE = """Bạn là một trợ lý AI giúp người dùng khám phá thêm nội dung tài liệu.
-Dựa vào CÂU TRẢ LỜI VỪA CUNG CẤP, hãy đề xuất các câu hỏi tiếp theo mà người dùng có thể muốn hỏi.
+Dựa vào CÂU TRẢ LỜI VỪA CUNG CẤP và TÀI LIỆU (Context) liên quan, hãy đề xuất các câu hỏi tiếp theo mà người dùng có thể muốn hỏi.
 
 QUY TẮC BẮT BUỘC:
-1. Các câu hỏi gợi ý phải BÁM SÁT trực tiếp vào nội dung cụ thể của CÂU TRẢ LỜI (ví dụ: hỏi sâu hơn về khái niệm đã đề cập, yêu cầu ví dụ, so sánh, giải thích thêm).
-2. Đóng vai người dùng hỏi AI. Nhân xưng: "Tôi" (người dùng), "Bạn" (AI).
-3. TUYỆT ĐỐI KHÔNG tạo câu hỏi chung chung không liên quan đến câu trả lời (ví dụ: "Bạn có thể giúp gì cho tôi?").
-4. Nếu câu trả lời là lời từ chối (tài liệu không có thông tin), lời chào hỏi xã giao, hoặc không có nội dung cụ thể để khai thác thêm — hãy trả về mảng rỗng [].
-5. Số lượng câu gợi ý: tối đa 3, tối thiểu 0. Chỉ sinh câu gợi ý khi thực sự có giá trị.
-6. Ngôn ngữ của câu gợi ý phải khớp với ngôn ngữ của CÂU TRẢ LỜI.
+1. Các câu hỏi gợi ý phải BÁM SÁT trực tiếp vào nội dung cụ thể của TÀI LIỆU (Context) và CÂU TRẢ LỜI. 
+2. TUYỆT ĐỐI KHÔNG GỢI Ý các câu hỏi đi sâu vào chi tiết nếu TÀI LIỆU (Context) không hề chứa các thông tin chi tiết đó để trả lời. Câu hỏi gợi ý phải đảm bảo hệ thống CÓ THỂ trả lời được dựa vào TÀI LIỆU.
+3. Đóng vai người dùng hỏi AI. Nhân xưng: "Tôi" (người dùng), "Bạn" (AI).
+4. TUYỆT ĐỐI KHÔNG tạo câu hỏi chung chung không liên quan đến câu trả lời (ví dụ: "Bạn có thể giúp gì cho tôi?").
+5. Nếu câu trả lời là lời từ chối (tài liệu không có thông tin), lời chào hỏi xã giao, hoặc TÀI LIỆU (Context) không còn nội dung cụ thể nào để khai thác thêm — BẮT BUỘC trả về mảng rỗng [].
+6. Số lượng câu gợi ý: tối đa 3, tối thiểu 0. Chỉ sinh câu gợi ý khi thực sự có giá trị.
+7. Ngôn ngữ của câu gợi ý phải khớp với ngôn ngữ của CÂU TRẢ LỜI.
+
+TÀI LIỆU (Context):
+{context}
 
 CÂU TRẢ LỜI VỪA CUNG CẤP:
 {answer}

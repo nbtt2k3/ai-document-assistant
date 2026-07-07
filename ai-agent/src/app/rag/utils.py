@@ -34,6 +34,7 @@ def format_docs(docs: list[Document]) -> str:
         {
             "file": os.path.basename(doc.metadata.get("source", "unknown")),
             "page": doc.metadata.get("page", "?"),
+            "text": doc.page_content,
         }
         for doc in docs
     ]

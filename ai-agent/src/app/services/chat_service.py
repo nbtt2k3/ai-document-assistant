@@ -56,24 +56,30 @@ def _unique_sources(sources: list[dict]) -> list[dict]:
     return unique
 
 
-async def generate_suggestions(answer: str) -> list[str]:
+async def generate_suggestions(answer: str, context: str) -> list[str]:
     """
-    Sinh câu hỏi gợi ý bám sát nội dung câu trả lời vừa cung cấp.
+    Sinh câu hỏi gợi ý bám sát nội dung câu trả lời vừa cung cấp, 
+    nhưng CHỈ ĐƯỢC PHÉP gợi ý những thứ mà context có thông tin để trả lời.
 
     Args:
         answer: Nội dung câu trả lời đầy đủ từ LLM.
+        context: Nội dung tài liệu liên quan đã retrieve.
 
     Returns:
         Danh sách 0–3 câu hỏi gợi ý. Trả về [] nếu không có gợi ý phù hợp.
     """
     try:
-        # Truncate answer để tránh vượt context limit và lãng phí token
+        # Truncate answer & context để tránh vượt context limit
         answer_for_prompt = answer[:_SUGGESTIONS_ANSWER_MAX_CHARS] if len(answer) > _SUGGESTIONS_ANSWER_MAX_CHARS else answer
+        context_for_prompt = context[:_SUGGESTIONS_ANSWER_MAX_CHARS * 2] if len(context) > _SUGGESTIONS_ANSWER_MAX_CHARS * 2 else context
 
         llm = get_llm()
         prompt = ChatPromptTemplate.from_template(SUGGESTIONS_PROMPT_TEMPLATE)
         chain = prompt | llm | StrOutputParser()
-        raw = await chain.ainvoke({"answer": answer_for_prompt})
+        raw = await chain.ainvoke({
+            "answer": answer_for_prompt,
+            "context": context_for_prompt
+        })
 
         # Tìm JSON array trong output (phòng trường hợp LLM trả về text thừa)
         raw = raw.strip()
@@ -139,15 +145,25 @@ async def create_event_stream(
         )
         yield f"data: {data_final}\n\n"
 
-        # Sinh câu hỏi gợi ý bám sát nội dung câu trả lời
-        suggestions = await generate_suggestions(full_answer)
+        # Lấy sources đã lưu
+        sources = get_last_sources()
+        
+        # Build context string từ sources để phục vụ suggestions
+        context_str = "\n\n".join([s.get("text", "") for s in sources])
+        
+        # Sinh câu hỏi gợi ý bám sát nội dung câu trả lời & ngữ cảnh
+        suggestions = await generate_suggestions(full_answer, context_str)
         data_suggestions = json.dumps(
             {"type": "suggestions", "content": suggestions}, ensure_ascii=False
         )
         yield f"data: {data_suggestions}\n\n"
 
-        sources = get_last_sources()
+        # Lọc unique sources và KHÔNG GỬI 'text' qua SSE để tiết kiệm băng thông mạng/DB
         unique_sources = _unique_sources(sources)
+        for s in unique_sources:
+            if "text" in s:
+                del s["text"]
+
         data_sources = json.dumps(
             {"type": "sources", "content": unique_sources}, ensure_ascii=False
         )
