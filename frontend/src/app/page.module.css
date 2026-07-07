@@ -163,6 +163,8 @@
 
 .message {
   max-width: 80%;
+  width: fit-content;
+  min-width: 48px;
   padding: 18px 24px;
   border-radius: 16px;
   line-height: 1.7;
