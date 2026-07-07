@@ -24,7 +24,7 @@ export default function MessageBubble({
           display: 'flex',
           flexDirection: 'column',
           alignItems: isUser ? 'flex-end' : 'flex-start',
-          maxWidth: '100%',
+          maxWidth: '80%',
         }}
       >
         {/* Bubble */}
