@@ -50,8 +50,10 @@ XAI_LLM_MODEL          = os.environ.get("XAI_LLM_MODEL", "grok-beta")
 GROQ_LLM_MODEL         = os.environ.get("GROQ_LLM_MODEL", "llama-3.3-70b-versatile")
 
 OPENAI_LLM_MODEL       = os.environ.get("OPENAI_LLM_MODEL", "gpt-4o-mini")
+OPENAI_EMBEDDING_MODEL = os.environ.get("OPENAI_EMBEDDING_MODEL", "text-embedding-3-small")
 
 GEMINI_LLM_MODEL       = os.environ.get("GEMINI_LLM_MODEL", "gemini-2.5-flash")
+GEMINI_EMBEDDING_MODEL = os.environ.get("GEMINI_EMBEDDING_MODEL", "text-embedding-004")
 
 # ── Local Model Names (Ollama) ────────────────────────────────────────────────
 # HƯỚNG DẪN CHỌN MODEL CHO CẤU HÌNH MÁY (Sử dụng Ollama Local - mặc định khi không có API Key):
