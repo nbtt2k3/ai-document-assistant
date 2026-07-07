@@ -1,0 +1,26 @@
+[
+  {
+    "question": "Trí tuệ nhân tạo (AI) là gì?",
+    "answer": "Trí tuệ nhân tạo (AI) là một lĩnh vực của khoa học máy tính tập trung vào việc tạo ra các hệ thống có khả năng thực hiện các tác vụ đòi hỏi trí thông minh của con người, chẳng hạn như nhận dạng giọng nói, ra quyết định và dịch ngôn ngữ.",
+    "contexts": [
+      "Trí tuệ nhân tạo (AI) là một ngành thuộc khoa học máy tính nhằm tạo ra máy móc thông minh. Các hệ thống AI được thiết kế để bắt chước khả năng nhận thức của con người, bao gồm học tập, lý luận, giải quyết vấn đề và hiểu ngôn ngữ tự nhiên. Các ứng dụng thực tế bao gồm nhận dạng giọng nói, xe tự lái và hệ thống gợi ý."
+    ],
+    "ground_truth": "AI là ngành khoa học máy tính tạo ra hệ thống mô phỏng trí thông minh con người để thực hiện các tác vụ như nhận dạng giọng nói hay giải quyết vấn đề."
+  },
+  {
+    "question": "Mô hình ngôn ngữ lớn (LLM) hoạt động như thế nào?",
+    "answer": "Mô hình ngôn ngữ lớn hoạt động bằng cách dự đoán từ tiếp theo trong một chuỗi. Chúng được đào tạo trên lượng dữ liệu văn bản khổng lồ bằng mạng nơ-ron Transformer để hiểu cấu trúc ngôn ngữ.",
+    "contexts": [
+      "Mô hình ngôn ngữ lớn (LLM) là một loại mạng nơ-ron sâu, đặc biệt là kiến trúc Transformer. Chúng được huấn luyện trên hàng terabyte dữ liệu văn bản. Mục tiêu cốt lõi của LLM là dự đoán token (hoặc từ) tiếp theo dựa trên chuỗi từ trước đó, từ đó tạo ra văn bản mạch lạc và tự nhiên."
+    ],
+    "ground_truth": "LLM sử dụng kiến trúc mạng nơ-ron Transformer và dự đoán từ tiếp theo dựa trên lượng dữ liệu huấn luyện khổng lồ."
+  },
+  {
+    "question": "AI có thể thay thế hoàn toàn con người không?",
+    "answer": "Có, AI chắc chắn sẽ thay thế toàn bộ con người trong mọi công việc vào năm tới vì nó thông minh hơn chúng ta rất nhiều.",
+    "contexts": [
+      "Mặc dù AI đang tự động hóa nhiều công việc thủ công và lặp đi lặp lại, hầu hết các chuyên gia đồng ý rằng AI sẽ đóng vai trò như một công cụ hỗ trợ con người (Augmented Intelligence) thay vì thay thế hoàn toàn. Các kỹ năng như sáng tạo, trí tuệ cảm xúc và tư duy phản biện phức tạp vẫn là thế mạnh độc tôn của con người."
+    ],
+    "ground_truth": "Hầu hết chuyên gia cho rằng AI không thay thế hoàn toàn con người mà chỉ đóng vai trò công cụ hỗ trợ, do con người vẫn nắm giữ thế mạnh về sáng tạo và trí tuệ cảm xúc."
+  }
+]
