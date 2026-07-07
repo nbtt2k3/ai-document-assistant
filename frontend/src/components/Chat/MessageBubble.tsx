@@ -44,9 +44,35 @@ export default function MessageBubble({
           )}
         </div>
 
+        {/* Sources chips */}
+        {message.sources && message.sources.length > 0 && (
+          <div className={`${styles.sourcesContainer} animate-fade-in-up`} style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+            {message.sources.map((src, i) => {
+              const fileName = src.file.split(/[/\\]/).pop();
+              return (
+                <div
+                  key={i}
+                  className={styles.sourceChip}
+                  style={{
+                    fontSize: '0.75rem',
+                    padding: '4px 8px',
+                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
+                    border: '1px solid rgba(255, 255, 255, 0.2)',
+                    borderRadius: '4px',
+                    color: '#aaa',
+                  }}
+                  title={src.file}
+                >
+                  📄 {fileName} {src.page && src.page !== '?' ? `(Trang ${src.page})` : ''}
+                </div>
+              );
+            })}
+          </div>
+        )}
+
         {/* Suggestion chips */}
         {message.suggestions && message.suggestions.length > 0 && (
-          <div className={`${styles.suggestionsContainer} animate-fade-in-up`}>
+          <div className={`${styles.suggestionsContainer} animate-fade-in-up`} style={{ marginTop: '8px' }}>
             {message.suggestions.map((sug, i) => (
               <button
                 key={i}

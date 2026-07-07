@@ -18,6 +18,11 @@ _last_retrieved_sources: contextvars.ContextVar[list[dict]] = contextvars.Contex
 )
 
 
+def reset_sources():
+    """Reset danh sách nguồn về [] trước mỗi request — tránh rò rỉ từ request trước."""
+    _last_retrieved_sources.set([])
+
+
 def get_last_sources() -> list[dict]:
     """Trả về danh sách nguồn tài liệu của lần retrieve gần nhất."""
     return _last_retrieved_sources.get()

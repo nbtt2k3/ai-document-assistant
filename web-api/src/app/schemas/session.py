@@ -27,6 +27,7 @@ class MessageResponse(BaseModel):
     """Response trả về một tin nhắn trong session."""
     role: str
     content: str
+    sources: list | None = None
     created_at: datetime
 
     model_config = {"from_attributes": True}

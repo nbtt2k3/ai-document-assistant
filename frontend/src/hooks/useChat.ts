@@ -1,65 +1,10 @@
 'use client';
 
 import { useState } from 'react';
-import { Message, ParsedBotMessage } from '@/types';
+import { Message } from '@/types';
 import { getAuthToken } from '@/lib/api';
 
-const API_BASE = 'http://127.0.0.1:8000/api';
-
-// ─── Helper: Parse bot message để tách [SUGGESTIONS] ────────────────────────
-export function parseBotMessage(rawContent: string): ParsedBotMessage {
-  let displayContent = rawContent;
-  let suggestions: string[] = [];
-  
-  // 1. Thử tìm thẻ [SUGGESTIONS]
-  const suggestMatch = rawContent.match(/\[SUGGESTIONS\]([^\n]*)/i);
-  if (suggestMatch) {
-    displayContent = rawContent.replace(suggestMatch[0], '').trim();
-    const rawText = suggestMatch[1].replace(/\d+\.\s/g, '|').replace(/"/g, '');
-    suggestions = rawText.split('|').map((s) => s.trim()).filter((s) => s.length > 5 && s.includes('?'));
-  } else {
-    // 2. Fallback: Bắt các danh sách 1. 2. 3. hoặc gạch đầu dòng ở phần cuối của tin nhắn
-    const lines = rawContent.split('\n');
-    const potentialSuggestions = [];
-    let stopIndex = lines.length - 1;
-
-    while (stopIndex >= 0) {
-      const line = lines[stopIndex].trim();
-      if (!line) {
-        stopIndex--;
-        continue;
-      }
-      
-      // Match "1. Câu hỏi?" hoặc "- Câu hỏi?" hoặc "* Câu hỏi?"
-      const listMatch = line.match(/^(\d+[\.\)]|\-|\*)\s+(.*?\?.*)$/);
-      if (listMatch) {
-        potentialSuggestions.unshift(listMatch[2].trim());
-        stopIndex--;
-      } else {
-        break;
-      }
-    }
-
-    // Nếu tìm thấy từ 2 câu hỏi trở lên ở cuối bài, coi đó là suggestions
-    if (potentialSuggestions.length >= 2) {
-      suggestions = potentialSuggestions;
-      displayContent = lines.slice(0, stopIndex + 1).join('\n').trim();
-      
-      // Cắt luôn câu dẫn dư thừa như "Here are three questions:"
-      const lastLine = displayContent.split('\n').pop()?.trim().toLowerCase() || "";
-      if (lastLine.includes("question") || lastLine.includes("câu hỏi") || lastLine.includes("gợi ý") || lastLine.includes("explore further")) {
-         displayContent = displayContent.substring(0, displayContent.lastIndexOf('\n')).trim();
-      }
-    }
-  }
-
-  // Xóa ký tự '|' dư thừa ở cuối văn bản nếu có
-  if (displayContent.endsWith('|')) {
-    displayContent = displayContent.slice(0, -1).trim();
-  }
-
-  return { content: displayContent, suggestions };
-}
+const API_BASE = process.env.NEXT_PUBLIC_API_URL || 'http://127.0.0.1:8000/api';
 
 // ─── Hook ────────────────────────────────────────────────────────────────────
 export function useChat(activeSessionId: string | null) {
@@ -75,14 +20,8 @@ export function useChat(activeSessionId: string | null) {
         headers: { Authorization: `Bearer ${token}` },
       });
       const data: Message[] = await res.json();
-      const parsed = data.map((msg) => {
-        if (msg.role === 'bot') {
-          const { content, suggestions } = parseBotMessage(msg.content);
-          return { ...msg, content, suggestions };
-        }
-        return msg;
-      });
-      setMessages(parsed);
+      // Suggestions đã được lưu sẵn trong DB và trả về từ API — không cần parse
+      setMessages(data);
     } catch (e) {
       console.error('loadMessages error:', e);
     }
@@ -112,7 +51,7 @@ export function useChat(activeSessionId: string | null) {
       // Tự động tóm tắt nội dung file vừa upload
       setTimeout(() => {
         sendQuery(
-          `[SYSTEM] File "${file.name}" vừa được tải lên. Hãy đóng vai một trợ lý AI thông minh: \n1. Xác nhận thân thiện rằng bạn đã nhận được file.\n2. Tóm tắt nội dung chính của tài liệu một cách tự nhiên.\n3. QUAN TRỌNG: Hãy nhận diện ngôn ngữ của tài liệu và BẮT BUỘC sử dụng CHÍNH NGÔN NGỮ ĐÓ để viết câu chào, bài tóm tắt và 3 câu hỏi gợi ý.`,
+          `[SYSTEM] File "${file.name}" vừa được tải lên. Hãy tóm tắt ngắn gọn nội dung của tài liệu này.`,
           true
         );
       }, 500);
@@ -122,6 +61,20 @@ export function useChat(activeSessionId: string | null) {
     } finally {
       setIsUploading(false);
     }
+  };
+
+  // Cập nhật suggestions của message bot cuối cùng
+  const updateLastBotSuggestions = (suggestions: string[]) => {
+    setMessages((prev) => {
+      const updated = [...prev];
+      for (let i = updated.length - 1; i >= 0; i--) {
+        if (updated[i].role === 'bot') {
+          updated[i] = { ...updated[i], suggestions };
+          break;
+        }
+      }
+      return updated;
+    });
   };
 
   // Gửi câu hỏi và nhận SSE streaming
@@ -157,7 +110,7 @@ export function useChat(activeSessionId: string | null) {
       let buffer = '';
       setMessages((prev) => [
         ...prev,
-        { role: 'bot', content: '', isThinking: true },
+        { role: 'bot', content: '', suggestions: [], isThinking: true },
       ]);
 
       while (true) {
@@ -177,27 +130,64 @@ export function useChat(activeSessionId: string | null) {
 
             try {
               const parsed = JSON.parse(dataStr);
-              if (parsed.type === 'chunk' || parsed.type === 'final_answer') {
-                botResponse =
-                  parsed.type === 'chunk' ? botResponse + parsed.content : parsed.content;
 
-                const { content, suggestions } = parseBotMessage(botResponse);
+              if (parsed.type === 'chunk') {
+                // Streaming: hiển thị raw content, chưa có suggestions
+                botResponse = botResponse + parsed.content;
                 setMessages((prev) => {
                   const updated = [...prev];
                   for (let i = updated.length - 1; i >= 0; i--) {
                     if (updated[i].role === 'bot') {
                       updated[i] = {
                         ...updated[i],
-                        content,
-                        suggestions,
-                        isThinking: content.trim() === '' && parsed.type !== 'final_answer',
+                        content: botResponse,
+                        suggestions: [],
+                        isThinking: botResponse.trim() === '',
                       };
                       break;
                     }
                   }
                   return updated;
                 });
+
+              } else if (parsed.type === 'final_answer') {
+                // Câu trả lời hoàn chỉnh — chỉ cập nhật content, suggestions sẽ đến sau
+                botResponse = parsed.content;
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  for (let i = updated.length - 1; i >= 0; i--) {
+                    if (updated[i].role === 'bot') {
+                      updated[i] = {
+                        ...updated[i],
+                        content: botResponse,
+                        suggestions: [],
+                        isThinking: false,
+                      };
+                      break;
+                    }
+                  }
+                  return updated;
+                });
+
+              } else if (parsed.type === 'suggestions') {
+                // Câu hỏi gợi ý được sinh riêng bởi backend — cập nhật trực tiếp
+                const suggestions: string[] = Array.isArray(parsed.content) ? parsed.content : [];
+                updateLastBotSuggestions(suggestions);
+              } else if (parsed.type === 'sources') {
+                // Nguồn trích dẫn (citations)
+                const sources = Array.isArray(parsed.content) ? parsed.content : [];
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  for (let i = updated.length - 1; i >= 0; i--) {
+                    if (updated[i].role === 'bot') {
+                      updated[i] = { ...updated[i], sources };
+                      break;
+                    }
+                  }
+                  return updated;
+                });
               }
+
             } catch (err) {
               console.error('Parse error', err, dataStr);
             }

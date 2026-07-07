@@ -1,11 +1,14 @@
 # Core LangChain
-langchain==0.3.7
-langchain-community==0.3.7
-langchain-chroma==0.1.4
-langchain-ollama==0.2.1
-langchain-openai==0.2.12
-langchain-google-genai==2.0.6
+langchain>=0.3.7
+langchain-community>=0.3.7
+langchain-chroma>=0.1.4
+langchain-ollama>=0.2.1
+langchain-openai>=0.2.12
+langchain-google-genai
 langchain-xai
+langchain-groq
+langgraph>=0.2.56
+
 # Document loaders & text splitter
 pymupdf4llm==1.27.2.3
 markitdown[all]==0.1.6
@@ -17,7 +20,7 @@ paddlepaddle==3.3.1
 paddleocr==3.7.0
 
 # Vector database & Search
-chromadb==0.5.23
+chromadb>=0.5.23
 rank_bm25==0.2.2
 flashrank
 
@@ -31,4 +34,8 @@ pydantic
 
 # Database & Auth
 # (Đã loại bỏ vì ai-agent không cần kết nối SQL hay Auth trực tiếp)
-python-multipart
+python-multipart
+
+# Tokenizer (Vietnamese)
+underthesea>=1.3.1
+

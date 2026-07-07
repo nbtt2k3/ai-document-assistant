@@ -39,6 +39,7 @@ STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 GITHUB_TOKEN       = os.environ.get("GITHUB_TOKEN", "")
 OPENROUTER_API_KEY = os.environ.get("OPENROUTER_API_KEY", "")
 XAI_API_KEY = os.environ.get("XAI_API_KEY", "")
+GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 
@@ -46,6 +47,7 @@ GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 GITHUB_LLM_MODEL       = os.environ.get("GITHUB_LLM_MODEL", "gpt-4o")
 OPENROUTER_LLM_MODEL   = os.environ.get("OPENROUTER_LLM_MODEL", "qwen/qwen3-coder:free")
 XAI_LLM_MODEL          = os.environ.get("XAI_LLM_MODEL", "grok-beta")
+GROQ_LLM_MODEL         = os.environ.get("GROQ_LLM_MODEL", "llama-3.3-70b-versatile")
 
 OPENAI_LLM_MODEL       = os.environ.get("OPENAI_LLM_MODEL", "gpt-4o-mini")
 
@@ -54,9 +56,24 @@ GEMINI_LLM_MODEL       = os.environ.get("GEMINI_LLM_MODEL", "gemini-2.5-flash")
 # ── Local Model Names (Ollama) ────────────────────────────────────────────────
 # HƯỚNG DẪN CHỌN MODEL CHO CẤU HÌNH MÁY (Sử dụng Ollama Local - mặc định khi không có API Key):
 OLLAMA_BASE_URL  = os.environ.get("OLLAMA_BASE_URL", "http://host.docker.internal:11434")
-EMBEDDING_MODEL  = "bge-m3"
-LLM_MODEL        = "qwen3:4b"
+EMBEDDING_MODEL  = os.environ.get("OLLAMA_EMBEDDING_MODEL", "bge-m3")
+LLM_MODEL        = os.environ.get("OLLAMA_LLM_MODEL", "llama3.1:8b")
 
 # ── Text splitting ────────────────────────────────────────────────────────────
-CHUNK_SIZE    = 800
-CHUNK_OVERLAP = 150
+CHUNK_SIZE    = int(os.environ.get("CHUNK_SIZE", 800))
+CHUNK_OVERLAP = int(os.environ.get("CHUNK_OVERLAP", 150))
+
+# ── Retrieval tuning ──────────────────────────────────────────────────────────
+# Số tài liệu giữ lại sau bước reranking (FlashrankRerank)
+# Tăng nếu muốn LLM có nhiều ngữ cảnh hơn, giảm nếu muốn tiết kiệm token
+RERANK_TOP_N  = int(os.environ.get("RERANK_TOP_N", 5))
+
+# ── Upload limits ─────────────────────────────────────────────────────────────
+# Kích thước file tối đa cho phép upload (đơn vị: MB)
+MAX_FILE_SIZE_MB = int(os.environ.get("MAX_FILE_SIZE_MB", 50))
+
+# ── CORS ────────────────────────────────────────────────────────────────────
+# Service nội bộ — chỉ web-api và localhost mới cần gọi trực tiếp
+# Trong production, không nên expose port 8001 ra ngoài
+_raw_origins = os.environ.get("ALLOWED_ORIGINS", "http://localhost:3000,http://localhost:8000,http://web-api:8000")
+ALLOWED_ORIGINS = [o.strip() for o in _raw_origins.split(",") if o.strip()]

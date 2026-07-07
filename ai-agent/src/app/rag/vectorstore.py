@@ -3,6 +3,8 @@ rag/vectorstore.py — ChromaDB vector store wrapper.
 
 Quản lý việc lưu trữ, tìm kiếm và xóa vectors theo session_id.
 Embedding được lấy từ embedder.py (dễ swap provider).
+
+Singleton Chroma instance: tránh tạo lại connection mỗi lần gọi.
 """
 from langchain.text_splitter import RecursiveCharacterTextSplitter
 from langchain_chroma import Chroma
@@ -12,12 +14,20 @@ from src.app.config import VECTORSTORE_PATH, CHUNK_SIZE, CHUNK_OVERLAP
 from src.app.rag.embedder import get_embedder
 
 
+# ── Chroma Singleton ──────────────────────────────────────────────────────────
+_chroma_db: Chroma = None
+
+
 def _get_chroma_db() -> Chroma:
-    """Khởi tạo Chroma DB instance với embedding function hiện tại."""
-    return Chroma(
+    """Trả về Chroma singleton instance (tạo 1 lần, tái sử dụng cho toàn app)."""
+    global _chroma_db
+    if _chroma_db is not None:
+        return _chroma_db
+    _chroma_db = Chroma(
         persist_directory=VECTORSTORE_PATH,
         embedding_function=get_embedder()
     )
+    return _chroma_db
 
 
 def _split_text(docs: list[Document]) -> list[Document]:
@@ -45,8 +55,9 @@ def add_documents_to_session(session_id: str, docs: list[Document]):
 def get_retriever_for_session(session_id: str):
     """Lấy Chroma retriever với filter theo session_id."""
     db = _get_chroma_db()
-    
-    # Đếm số lượng chunks thực tế của session này để tránh lỗi hnswlib "Cannot return the results in a contigious 2D array"
+
+    # Đếm số lượng chunks thực tế của session này để tránh lỗi hnswlib
+    # "Cannot return the results in a contiguous 2D array"
     try:
         results = db.get(where={"session_id": session_id}, include=[])
         num_chunks = len(results.get("ids", []))
@@ -62,6 +73,7 @@ def get_retriever_for_session(session_id: str):
             "filter": {"session_id": session_id}
         }
     )
+
 
 def get_retriever_for_section(session_id: str, section_title: str, level: int):
     """Lấy Chroma retriever chỉ filter các chunk thuộc một section cụ thể."""
@@ -90,10 +102,34 @@ def get_session_metadatas(session_id: str) -> list[dict]:
         return []
 
 
+def get_session_documents(session_id: str) -> list[Document]:
+    """
+    Lấy tất cả documents của một session từ Chroma.
+    Dùng để rebuild BM25 index sau khi container restart.
+    """
+    db = _get_chroma_db()
+    try:
+        results = db.get(
+            where={"session_id": session_id},
+            include=["documents", "metadatas"]
+        )
+        docs = []
+        texts = results.get("documents", [])
+        metas = results.get("metadatas", [])
+        for text, meta in zip(texts, metas):
+            if text:
+                docs.append(Document(page_content=text, metadata=meta or {}))
+        return docs
+    except Exception as e:
+        print(f"[vectorstore] Error fetching documents for session {session_id}: {e}")
+        return []
+
+
 def remove_documents_for_session(session_id: str):
     """Xóa tất cả vectors của một session khỏi Chroma."""
     db = _get_chroma_db()
     try:
-        db._collection.delete(where={"session_id": session_id})
+        # Dùng public API thay vì db._collection.delete() (private)
+        db.delete(where={"session_id": session_id})
     except Exception as e:
         print(f"[vectorstore] Error removing session {session_id}: {e}")

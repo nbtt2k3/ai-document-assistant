@@ -4,6 +4,7 @@ api/document_routes.py — Routes cho upload tài liệu và Table of Contents.
 from fastapi import APIRouter, HTTPException, UploadFile, File
 from pathlib import Path
 
+from src.app.config import MAX_FILE_SIZE_MB
 from src.app.services.document_service import (
     save_upload_file,
     process_upload,
@@ -25,6 +26,16 @@ async def internal_ingest(session_id: str, file: UploadFile = File(...)):
         )
 
     content = await file.read()
+
+    # Kiểm tra kích thước file — tránh OOM khi xử lý file quá lớn
+    max_bytes = MAX_FILE_SIZE_MB * 1024 * 1024
+    if len(content) > max_bytes:
+        raise HTTPException(
+            status_code=413,
+            detail=f"File vượt quá giới hạn {MAX_FILE_SIZE_MB}MB "
+                   f"(kích thước hiện tại: {len(content) / 1024 / 1024:.1f}MB)."
+        )
+
     file_path = save_upload_file(session_id, file.filename, content)
 
     try:

@@ -14,17 +14,13 @@ export interface Message {
   content: string;
   created_at?: string;
   suggestions?: string[];
+  sources?: SourceItem[];
   isThinking?: boolean;
 }
 
-export interface ParsedBotMessage {
-  content: string;
-  suggestions: string[];
-}
-
 export interface StreamEvent {
-  type: 'chunk' | 'final_answer' | 'sources' | 'error';
-  content: string | SourceItem[];
+  type: 'chunk' | 'final_answer' | 'suggestions' | 'sources' | 'error';
+  content: string | string[] | SourceItem[];
 }
 
 export interface SourceItem {

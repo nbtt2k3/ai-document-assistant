@@ -132,6 +132,7 @@ async def chat_endpoint(
                                         session_id=session_id, 
                                         role="bot", 
                                         content=data["content"],
+                                        sources=data.get("sources", []),
                                         created_at=bot_start_time
                                     )
                                     db.add(bot_msg)
