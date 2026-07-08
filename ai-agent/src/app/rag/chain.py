@@ -5,7 +5,7 @@ Xây dựng Hybrid Retriever (BM25 + Vector) + LLM chain cho từng session.
 Đây là trung tâm của RAG engine.
 
 Các thành phần được import từ:
-- prompts.py      : Prompt templates
+- prompts/prompt_manager.py: Prompt templates
 - llm_factory.py  : LLM provider selection (singleton)
 - utils.py        : format_docs, clean_output, citations
 """
@@ -18,7 +18,7 @@ from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
 
 from src.app.rag.llm_factory import get_llm
-from src.app.rag.utils import format_docs
+
 from src.app.rag.vectorstore import get_retriever_for_session
 from src.app.rag.bm25 import get_bm25_results
 from src.app.config import RERANK_TOP_N

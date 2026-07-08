@@ -47,11 +47,11 @@ export function useChat(activeSessionId: string | null) {
         ...prev,
         { role: 'user', content: `**${file.name}**` },
       ]);
-
-      // Tự động tóm tắt nội dung file vừa upload
+      
+      // Tự động thông báo cho AI biết đã có file mới
       setTimeout(() => {
         sendQuery(
-          `[SYSTEM] File "${file.name}" vừa được tải lên. Hãy tóm tắt ngắn gọn nội dung của tài liệu này.`,
+          `[SYSTEM] File "${file.name}" vừa được tải lên thành công. Dựa vào thông tin này, hãy nói "Tôi đã nhận được tài liệu ${file.name} và đã thêm vào bộ nhớ. Bạn muốn tôi giúp gì?" và KHÔNG CẦN TÓM TẮT.`,
           true
         );
       }, 500);

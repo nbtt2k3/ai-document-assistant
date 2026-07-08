@@ -17,7 +17,7 @@ from langchain_core.output_parsers import StrOutputParser
 
 from src.app.rag.chain import create_rag_chain_for_session
 from src.app.rag.llm_factory import get_llm
-from src.app.rag.prompts import SUGGESTIONS_PROMPT_TEMPLATE, MEMORY_SUMMARY_PROMPT_TEMPLATE
+from src.app.prompts.prompt_manager import PromptManager
 from src.app.rag.utils import get_last_sources, clean_output, reset_sources
 
 # Độ dài tối đa của answer trước khi truyền vào prompt gợi ý
@@ -74,7 +74,7 @@ async def generate_suggestions(answer: str, context: str) -> list[str]:
         context_for_prompt = context[:_SUGGESTIONS_ANSWER_MAX_CHARS * 2] if len(context) > _SUGGESTIONS_ANSWER_MAX_CHARS * 2 else context
 
         llm = get_llm()
-        prompt = ChatPromptTemplate.from_template(SUGGESTIONS_PROMPT_TEMPLATE)
+        prompt = ChatPromptTemplate.from_messages(PromptManager.get_langchain_messages("suggestions", "llama-3.1-8b-instant"))
         chain = prompt | llm | StrOutputParser()
         raw = await chain.ainvoke({
             "answer": answer_for_prompt,
@@ -126,10 +126,19 @@ async def create_event_stream(
     graph = create_rag_chain_for_session(session_id, section_title, level)
     raw_chunks = []
 
+    # Thay vì dùng ContextVar dễ bị mất giữa các luồng async, ta trích xuất trực tiếp từ graph events
+    retrieved_docs = []
+
     try:
         inputs = {"question": question, "chat_history": history_text}
 
         async for event in graph.astream_events(inputs, version="v2"):
+            # Bắt output của node retrieve để lấy documents
+            if event["event"] == "on_chain_end" and event.get("name") in ["retrieve", "retrieve_for_summarize", "retrieve_for_translate"]:
+                output = event.get("data", {}).get("output", {})
+                if isinstance(output, dict) and "documents" in output:
+                    retrieved_docs = output["documents"]
+
             if event["event"] == "on_chat_model_stream" and "final_generation" in event.get("tags", []):
                 chunk_content = event["data"]["chunk"].content
                 if chunk_content:
@@ -145,35 +154,48 @@ async def create_event_stream(
         )
         yield f"data: {data_final}\n\n"
 
-        # Lấy sources đã lưu
-        sources = get_last_sources()
+        import os
+        # Build sources array từ retrieved_docs
+        sources = [
+            {
+                "file": os.path.basename(doc.metadata.get("source", "unknown")),
+                "page": doc.metadata.get("page", "?"),
+                "text": doc.page_content,
+            }
+            for doc in retrieved_docs
+        ]
         
         # Build context string từ sources để phục vụ suggestions
         context_str = "\n\n".join([s.get("text", "") for s in sources])
         
-        # Sinh câu hỏi gợi ý bám sát nội dung câu trả lời & ngữ cảnh
-        suggestions = await generate_suggestions(full_answer, context_str)
+        # Đã tắt tính năng gợi ý câu hỏi theo yêu cầu
+        # suggestions = await generate_suggestions(full_answer, context_str)
         data_suggestions = json.dumps(
-            {"type": "suggestions", "content": suggestions}, ensure_ascii=False
+            {"type": "suggestions", "content": []}, ensure_ascii=False
         )
         yield f"data: {data_suggestions}\n\n"
 
-        # Lọc unique sources và KHÔNG GỬI 'text' qua SSE để tiết kiệm băng thông mạng/DB
+        # Lọc unique sources
         unique_sources = _unique_sources(sources)
-        for s in unique_sources:
-            if "text" in s:
-                del s["text"]
-
-        data_sources = json.dumps(
-            {"type": "sources", "content": unique_sources}, ensure_ascii=False
-        )
-        yield f"data: {data_sources}\n\n"
-
-        # Trả về full_answer và sources để API layer lưu vào DB
+        
+        # Trả về full_answer và sources (CÓ CHỨA TEXT) để API layer lưu vào DB
         data_save = json.dumps(
             {"type": "_save_answer", "content": full_answer, "sources": unique_sources}, ensure_ascii=False
         )
         yield f"data: {data_save}\n\n"
+
+        # TẠO BẢN SAO để KHÔNG GỬI 'text' qua giao diện Web nhằm tiết kiệm băng thông mạng
+        frontend_sources = []
+        for s in unique_sources:
+            s_copy = s.copy()
+            if "text" in s_copy:
+                del s_copy["text"]
+            frontend_sources.append(s_copy)
+
+        data_sources = json.dumps(
+            {"type": "sources", "content": frontend_sources}, ensure_ascii=False
+        )
+        yield f"data: {data_sources}\n\n"
 
     except Exception as e:
         logging.error(f"[chat_service] Streaming error: {e}")
@@ -188,7 +210,7 @@ async def summarize_memory(old_summary: str, new_messages: str) -> str:
     Tóm tắt lịch sử hội thoại cũ và mới thành một bản tóm tắt duy nhất.
     Async để không block event loop của FastAPI.
     """
-    prompt = ChatPromptTemplate.from_template(MEMORY_SUMMARY_PROMPT_TEMPLATE)
+    prompt = ChatPromptTemplate.from_messages(PromptManager.get_langchain_messages("memory_summary", "llama-3.1-8b-instant"))
     chain = prompt | get_llm() | StrOutputParser()
 
     return await chain.ainvoke({

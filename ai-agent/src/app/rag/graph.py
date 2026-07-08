@@ -9,16 +9,7 @@ from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableConfig
 
 from src.app.rag.llm_factory import get_llm
-from src.app.rag.prompts import (
-    ROUTER_PROMPT_TEMPLATE,
-    CHITCHAT_PROMPT_TEMPLATE,
-    SUMMARIZE_PROMPT_TEMPLATE,
-    TRANSLATE_PROMPT_TEMPLATE,
-    RAG_SYSTEM_PROMPT,
-    RAG_HUMAN_PROMPT,
-    GRADE_DOCUMENT_PROMPT_TEMPLATE,
-    REWRITE_QUERY_PROMPT_TEMPLATE
-)
+from src.app.prompts.prompt_manager import PromptManager
 from src.app.rag.utils import format_docs
 
 class GraphState(TypedDict):
@@ -36,10 +27,12 @@ def create_crag_graph(session_id: str, section_title: str = None, level: int = N
     retriever = get_base_retriever(session_id, section_title, level)
 
     async def route_question(state: GraphState):
-        prompt = ChatPromptTemplate.from_template(ROUTER_PROMPT_TEMPLATE)
+        prompt = ChatPromptTemplate.from_messages(PromptManager.get_langchain_messages("router", "llama-3.1-8b-instant"))
         chain = prompt | llm | StrOutputParser()
         intent = await chain.ainvoke({"question": state["question"], "chat_history": state["chat_history"]})
-        return {"intent": intent.strip().upper()}
+        intent = intent.strip().upper()
+        print(f"[ROUTER] Question: '{state['question']}' -> Intent: {intent}")
+        return {"intent": intent}
 
     async def retrieve(state: GraphState):
         documents = await retriever.ainvoke(state["question"])
@@ -57,7 +50,7 @@ def create_crag_graph(session_id: str, section_title: str = None, level: int = N
             print("[CRAG] Không tìm được tài liệu sau 2 lần rewrite, generate với context rỗng")
             return {"intent": "GENERATE"}
             
-        prompt = ChatPromptTemplate.from_template(GRADE_DOCUMENT_PROMPT_TEMPLATE)
+        prompt = ChatPromptTemplate.from_messages(PromptManager.get_langchain_messages("grade_document", "llama-3.1-8b-instant"))
         chain = prompt | llm | StrOutputParser()
         context = format_docs(documents)
         score = await chain.ainvoke({"question": state["question"], "context": context})
@@ -69,7 +62,7 @@ def create_crag_graph(session_id: str, section_title: str = None, level: int = N
             return {"intent": "REWRITE"}
 
     async def rewrite_query(state: GraphState):
-        prompt = ChatPromptTemplate.from_template(REWRITE_QUERY_PROMPT_TEMPLATE)
+        prompt = ChatPromptTemplate.from_messages(PromptManager.get_langchain_messages("rewrite_query", "llama-3.1-8b-instant"))
         chain = prompt | llm | StrOutputParser()
         new_question = await chain.ainvoke({"question": state["question"], "chat_history": state["chat_history"]})
         new_question = new_question.strip()
@@ -78,7 +71,7 @@ def create_crag_graph(session_id: str, section_title: str = None, level: int = N
         return {"question": new_question, "retries": retries}
 
     async def generate_rag(state: GraphState, config: RunnableConfig):
-        prompt = ChatPromptTemplate.from_messages([("system", RAG_SYSTEM_PROMPT), ("human", RAG_HUMAN_PROMPT)])
+        prompt = ChatPromptTemplate.from_messages(PromptManager.get_langchain_messages("rag", "llama-3.1-8b-instant"))
         chain = prompt | llm.with_config(tags=["final_generation"]) | StrOutputParser()
         context = format_docs(state.get("documents", []))
         generation = await chain.ainvoke({
@@ -89,20 +82,20 @@ def create_crag_graph(session_id: str, section_title: str = None, level: int = N
         return {"generation": generation}
 
     async def chitchat_node(state: GraphState, config: RunnableConfig):
-        prompt = ChatPromptTemplate.from_template(CHITCHAT_PROMPT_TEMPLATE)
+        prompt = ChatPromptTemplate.from_messages(PromptManager.get_langchain_messages("chitchat", "llama-3.1-8b-instant"))
         chain = prompt | llm.with_config(tags=["final_generation"]) | StrOutputParser()
         generation = await chain.ainvoke({"question": state["question"], "chat_history": state["chat_history"]}, config)
         return {"generation": generation}
 
     async def summarize_node(state: GraphState, config: RunnableConfig):
-        prompt = ChatPromptTemplate.from_template(SUMMARIZE_PROMPT_TEMPLATE)
+        prompt = ChatPromptTemplate.from_messages(PromptManager.get_langchain_messages("summarize", "llama-3.1-8b-instant"))
         chain = prompt | llm.with_config(tags=["final_generation"]) | StrOutputParser()
         context = format_docs(state.get("documents", []))
         generation = await chain.ainvoke({"question": state["question"], "chat_history": state["chat_history"], "context": context}, config)
         return {"generation": generation}
 
     async def translate_node(state: GraphState, config: RunnableConfig):
-        prompt = ChatPromptTemplate.from_template(TRANSLATE_PROMPT_TEMPLATE)
+        prompt = ChatPromptTemplate.from_messages(PromptManager.get_langchain_messages("translate", "llama-3.1-8b-instant"))
         chain = prompt | llm.with_config(tags=["final_generation"]) | StrOutputParser()
         context = format_docs(state.get("documents", []))
         generation = await chain.ainvoke({"question": state["question"], "chat_history": state["chat_history"], "context": context}, config)

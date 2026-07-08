@@ -22,7 +22,7 @@ from src.app.config import (
     OPENAI_API_KEY, OPENAI_LLM_MODEL,
     GEMINI_API_KEY, GEMINI_LLM_MODEL
 )
-from src.app.rag.prompts import STOP_SEQUENCES
+from src.app.prompts.base_prompt import STOP_SEQUENCES
 
 
 # ── LLM Singleton ─────────────────────────────────────────────────────────────
@@ -78,6 +78,7 @@ def get_llm():
             groq_api_key=GROQ_API_KEY,
             temperature=0.0,
             stop=STOP_SEQUENCES,
+            max_retries=5,
         )
     elif OPENAI_API_KEY:
         print(f"[INFO] Dang su dung LLM Online: OpenAI ({OPENAI_LLM_MODEL})")
