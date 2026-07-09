@@ -4,22 +4,70 @@ rag/vectorstore.py — ChromaDB vector store wrapper.
 Quản lý việc lưu trữ, tìm kiếm và xóa vectors theo session_id.
 Embedding được lấy từ embedder.py (dễ swap provider).
 
-Singleton Chroma instance: tránh tạo lại connection mỗi lần gọi.
+Tích hợp ParentDocumentRetriever và MarkdownHeaderTextSplitter để
+giữ nguyên cấu trúc văn bản và tránh mất ngữ cảnh.
 """
-from langchain.text_splitter import RecursiveCharacterTextSplitter
+from langchain_classic.retrievers import ParentDocumentRetriever
+from langchain_text_splitters import RecursiveCharacterTextSplitter, MarkdownHeaderTextSplitter
+from langchain_core.stores import BaseStore
 from langchain_chroma import Chroma
 from langchain_core.documents import Document
+import os
+import json
+from typing import Sequence, Optional, Iterator
+import logging
 
-from src.app.config import VECTORSTORE_PATH, CHUNK_SIZE, CHUNK_OVERLAP
+from src.app.config import VECTORSTORE_PATH, DOCSTORE_PATH, CHUNK_SIZE, CHUNK_OVERLAP
 from src.app.rag.embedder import get_embedder
 
 
-# ── Chroma Singleton ──────────────────────────────────────────────────────────
+# ── Singletons ──────────────────────────────────────────────────────────────
 _chroma_db: Chroma = None
+_docstore = None
+
+
+class LocalFileDocStore(BaseStore[str, Document]):
+    def __init__(self, path: str):
+        self.path = path
+        os.makedirs(path, exist_ok=True)
+        
+    def _get_path(self, key: str) -> str:
+        return os.path.join(self.path, f"{key}.json")
+        
+    def mget(self, keys: Sequence[str]) -> list[Optional[Document]]:
+        docs = []
+        for key in keys:
+            p = self._get_path(key)
+            if os.path.exists(p):
+                with open(p, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                    docs.append(Document(page_content=data["page_content"], metadata=data["metadata"]))
+            else:
+                docs.append(None)
+        return docs
+        
+    def mset(self, key_value_pairs: Sequence[tuple[str, Document]]) -> None:
+        for key, doc in key_value_pairs:
+            p = self._get_path(key)
+            with open(p, "w", encoding="utf-8") as f:
+                json.dump({"page_content": doc.page_content, "metadata": doc.metadata}, f, ensure_ascii=False)
+                
+    def mdelete(self, keys: Sequence[str]) -> None:
+        for key in keys:
+            p = self._get_path(key)
+            if os.path.exists(p):
+                os.remove(p)
+                
+    def yield_keys(self, prefix: Optional[str] = None) -> Iterator[str]:
+        for file in os.listdir(self.path):
+            if file.endswith(".json"):
+                key = file[:-5]
+                if prefix is None or key.startswith(prefix):
+                    yield key
 
 
 def _get_chroma_db() -> Chroma:
-    """Trả về Chroma singleton instance (tạo 1 lần, tái sử dụng cho toàn app)."""
+    """Trả về Chroma singleton instance."""
     global _chroma_db
     if _chroma_db is not None:
         return _chroma_db
@@ -30,44 +78,81 @@ def _get_chroma_db() -> Chroma:
     return _chroma_db
 
 
-def _split_text(docs: list[Document]) -> list[Document]:
-    """Chia nhỏ documents thành chunks để embedding."""
-    splitter = RecursiveCharacterTextSplitter(
+def _get_docstore():
+    """Trả về DocStore singleton instance cho ParentDocuments."""
+    global _docstore
+    if _docstore is not None:
+        return _docstore
+        
+    _docstore = LocalFileDocStore(DOCSTORE_PATH)
+    return _docstore
+
+
+def _get_child_splitter() -> RecursiveCharacterTextSplitter:
+    return RecursiveCharacterTextSplitter(
         chunk_size=CHUNK_SIZE,
         chunk_overlap=CHUNK_OVERLAP,
         length_function=len,
         separators=["\n\n", "\n", ".", " ", ""]
     )
-    return splitter.split_documents(docs)
 
 
 def add_documents_to_session(session_id: str, docs: list[Document]):
-    """Thêm documents vào Chroma, gắn tag session_id để filter sau."""
-    for i, doc in enumerate(docs):
-        doc.metadata["session_id"] = session_id
-        doc.metadata["chunk_index"] = i
-
-    splits = _split_text(docs)
+    """Thêm documents vào hệ thống với Parent-Child Retriever."""
     db = _get_chroma_db()
-    db.add_documents(splits)
+    store = _get_docstore()
+    
+    # 1. Tách văn bản theo cấu trúc Markdown Header (Parent Docs)
+    headers_to_split_on = [
+        ("#", "Header 1"),
+        ("##", "Header 2"),
+        ("###", "Header 3"),
+    ]
+    markdown_splitter = MarkdownHeaderTextSplitter(headers_to_split_on=headers_to_split_on)
+    
+    parent_docs = []
+    for doc in docs:
+        splits = markdown_splitter.split_text(doc.page_content)
+        if not splits: # Nếu không có header nào, lấy nguyên văn bản
+            doc.metadata["session_id"] = session_id
+            parent_docs.append(doc)
+            continue
+            
+        for split in splits:
+            # Gộp metadata gốc và thêm session_id
+            split.metadata.update(doc.metadata)
+            split.metadata["session_id"] = session_id
+            parent_docs.append(split)
+
+    # 2. Đưa vào ParentDocumentRetriever để tự động tạo Child Chunks
+    retriever = ParentDocumentRetriever(
+        vectorstore=db,
+        docstore=store,
+        child_splitter=_get_child_splitter()
+    )
+    
+    # Thêm vào hệ thống (Chroma lưu Child, DocStore lưu Parent)
+    retriever.add_documents(parent_docs)
 
 
 def get_retriever_for_session(session_id: str):
-    """Lấy Chroma retriever với filter theo session_id."""
+    """Lấy ParentDocumentRetriever với filter theo session_id."""
     db = _get_chroma_db()
+    store = _get_docstore()
 
-    # Đếm số lượng chunks thực tế của session này để tránh lỗi hnswlib
-    # "Cannot return the results in a contiguous 2D array"
+    # Đếm số lượng child chunks thực tế để tránh lỗi hnswlib
     try:
         results = db.get(where={"session_id": session_id}, include=[])
         num_chunks = len(results.get("ids", []))
     except Exception:
         num_chunks = 3
 
-    # Nếu không có chunk nào, vẫn set k=1 để Langchain không lỗi
-    k = min(3, num_chunks) if num_chunks > 0 else 1
+    k = min(5, num_chunks) if num_chunks > 0 else 1
 
-    return db.as_retriever(
+    return ParentDocumentRetriever(
+        vectorstore=db,
+        docstore=store,
+        child_splitter=_get_child_splitter(),
         search_kwargs={
             "k": k,
             "filter": {"session_id": session_id}
@@ -76,10 +161,15 @@ def get_retriever_for_session(session_id: str):
 
 
 def get_retriever_for_section(session_id: str, section_title: str, level: int):
-    """Lấy Chroma retriever chỉ filter các chunk thuộc một section cụ thể."""
+    """Lấy Retriever chỉ filter các chunk thuộc một section cụ thể."""
     db = _get_chroma_db()
+    store = _get_docstore()
     header_key = f"Header {level}"
-    return db.as_retriever(
+    
+    return ParentDocumentRetriever(
+        vectorstore=db,
+        docstore=store,
+        child_splitter=_get_child_splitter(),
         search_kwargs={
             "k": 100,  # Lấy nhiều nhất có thể cho một section
             "filter": {
@@ -93,7 +183,7 @@ def get_retriever_for_section(session_id: str, section_title: str, level: int):
 
 
 def get_session_metadatas(session_id: str) -> list[dict]:
-    """Lấy tất cả metadatas của một session từ Chroma (cho TOC, v.v.)."""
+    """Lấy tất cả metadatas của một session từ Chroma (Child chunks)."""
     db = _get_chroma_db()
     try:
         results = db.get(where={"session_id": session_id}, include=["metadatas"])
@@ -104,8 +194,7 @@ def get_session_metadatas(session_id: str) -> list[dict]:
 
 def get_session_documents(session_id: str) -> list[Document]:
     """
-    Lấy tất cả documents của một session từ Chroma.
-    Dùng để rebuild BM25 index sau khi container restart.
+    Lấy tất cả child documents của một session từ Chroma.
     """
     db = _get_chroma_db()
     try:
@@ -121,15 +210,53 @@ def get_session_documents(session_id: str) -> list[Document]:
                 docs.append(Document(page_content=text, metadata=meta or {}))
         return docs
     except Exception as e:
-        print(f"[vectorstore] Error fetching documents for session {session_id}: {e}")
+        logging.error(f"[vectorstore] Error fetching documents for session {session_id}: {e}")
+        return []
+
+def get_all_parent_documents(session_id: str) -> list[Document]:
+    """Lấy tất cả Parent Documents của một session để dùng cho Map-Reduce."""
+    db = _get_chroma_db()
+    store = _get_docstore()
+    try:
+        # Lấy metadatas để tìm doc_id của Parent Documents
+        results = db.get(where={"session_id": session_id}, include=["metadatas"])
+        metadatas = results.get("metadatas", [])
+        
+        doc_ids = set()
+        for meta in metadatas:
+            if meta and "doc_id" in meta:
+                doc_ids.add(meta["doc_id"])
+                
+        if not doc_ids:
+            return []
+            
+        parent_docs = store.mget(list(doc_ids))
+        # Filter out Nones
+        return [doc for doc in parent_docs if doc]
+    except Exception as e:
+        logging.error(f"[vectorstore] Error fetching parent documents for session {session_id}: {e}")
         return []
 
 
 def remove_documents_for_session(session_id: str):
-    """Xóa tất cả vectors của một session khỏi Chroma."""
+    """Xóa tất cả vectors và parent documents của một session."""
     db = _get_chroma_db()
+    store = _get_docstore()
     try:
-        # Dùng public API thay vì db._collection.delete() (private)
+        # Lấy metadatas để tìm doc_id của Parent Documents
+        results = db.get(where={"session_id": session_id}, include=["metadatas"])
+        metadatas = results.get("metadatas", [])
+        
+        doc_ids = set()
+        for meta in metadatas:
+            if meta and "doc_id" in meta:
+                doc_ids.add(meta["doc_id"])
+                
+        # Xóa Parent Documents khỏi LocalFileStore
+        if doc_ids:
+            store.mdelete(list(doc_ids))
+            
+        # Xóa Child Chunks khỏi Chroma
         db.delete(where={"session_id": session_id})
     except Exception as e:
-        print(f"[vectorstore] Error removing session {session_id}: {e}")
+        logging.error(f"[vectorstore] Error removing session {session_id}: {e}")

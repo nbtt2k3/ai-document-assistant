@@ -1,8 +1,8 @@
-version: '3.8'
 
 services:
   web-api:
-    build: ./web-api
+    build: 
+      context: ./web-api
     restart: always
     ports:
       - "8000:8000"
@@ -17,15 +17,19 @@ services:
       - AI_AGENT_URL=http://ai-agent:8001
 
   ai-agent:
-    build: ./ai-agent
+    build: 
+      context: ./ai-agent
     restart: always
     ports:
       - "8001:8001"
     volumes:
       - ./ai-agent:/app
+      - paddle_models:/root/.paddleocr
     environment:
       # If using local ollama on host machine, we need to be able to reach host.
       - OLLAMA_BASE_URL=http://host.docker.internal:11434
+      - HF_ENDPOINT=https://hf-mirror.com
+      - FLASHRANK_CACHE=/app/flashrank_cache
     extra_hosts:
       - "host.docker.internal:host-gateway"
 
@@ -43,3 +47,4 @@ services:
 
 volumes:
   postgres_data:
+  paddle_models:

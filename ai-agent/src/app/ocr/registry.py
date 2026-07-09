@@ -10,6 +10,7 @@ from src.app.ocr.pdf_reader import CustomPDFLoader
 from src.app.ocr.docx_reader import CustomDocxLoader
 from src.app.ocr.markitdown_reader import MarkItDownLoader
 from src.app.ocr.image_reader import ImageOCRLoader
+from src.app.ocr.excel_reader import CustomExcelLoader
 
 
 class Utf8TextLoader:
@@ -28,8 +29,8 @@ FILE_LOADERS: dict = {
     ".pdf":  CustomPDFLoader,
     ".txt":  Utf8TextLoader,
     ".docx": CustomDocxLoader,
-    ".xlsx": MarkItDownLoader,
-    ".csv":  MarkItDownLoader,
+    ".xlsx": CustomExcelLoader,
+    ".csv":  CustomExcelLoader,
     ".png":  ImageOCRLoader,
     ".jpg":  ImageOCRLoader,
     ".jpeg": ImageOCRLoader,

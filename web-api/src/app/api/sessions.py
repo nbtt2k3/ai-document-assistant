@@ -1,6 +1,6 @@
 import os
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, UploadFile, File
+from fastapi import APIRouter, Depends, HTTPException, UploadFile, File, Request
 from sqlalchemy.orm import Session
 import uuid
 from typing import List
@@ -9,6 +9,7 @@ from src.app.db.database import get_db
 from src.app.models.session import Session as DBSession
 from src.app.core.security import get_current_user_id
 from src.app.schemas.session import SessionCreate, SessionUpdate, SessionResponse, MessageResponse
+from src.app.core.rate_limit import limiter
 
 router = APIRouter(prefix="/api/sessions", tags=["Sessions"])
 
@@ -110,7 +111,9 @@ async def get_table_of_contents(
 
 
 @router.post("/{session_id}/upload")
+@limiter.limit("5/minute")
 async def upload_file(
+    request: Request,
     session_id: str,
     file: UploadFile = File(...),
     db: Session = Depends(get_db),
@@ -124,9 +127,18 @@ async def upload_file(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    content = await file.read()
+    ALLOWED_EXTENSIONS = {'.pdf', '.docx', '.txt', '.csv', '.xlsx'}
+    MAX_FILE_SIZE = 20 * 1024 * 1024 # 20MB
 
-    async with httpx.AsyncClient(timeout=300.0) as client:
+    file_ext = os.path.splitext(file.filename)[1].lower() if file.filename else ""
+    if file_ext not in ALLOWED_EXTENSIONS:
+        raise HTTPException(status_code=400, detail=f"Loại file không được hỗ trợ ({file_ext}). Cho phép: {', '.join(ALLOWED_EXTENSIONS)}")
+
+    content = await file.read()
+    if len(content) > MAX_FILE_SIZE:
+        raise HTTPException(status_code=400, detail="File quá lớn. Vui lòng tải lên file nhỏ hơn 20MB.")
+
+    async with httpx.AsyncClient(timeout=1800.0) as client:
         try:
             files = {"file": (file.filename, content, file.content_type)}
             response = await client.post(

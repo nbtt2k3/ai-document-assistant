@@ -9,12 +9,15 @@ from datetime import datetime
 # Đảm bảo có thể import code từ ai-agent
 sys.path.insert(0, os.path.abspath(os.path.join(os.path.dirname(__file__), '..')))
 
+from dotenv import load_dotenv
+load_dotenv()
+
 from langchain_groq import ChatGroq
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import JsonOutputParser
 
 # Thông số kết nối DB
-DB_HOST = os.getenv("DB_HOST", "localhost")
+DB_HOST = os.getenv("DB_HOST", "db")
 DB_PORT = os.getenv("DB_PORT", "5432")
 DB_USER = os.getenv("DB_USER", "rag_user")
 DB_PASS = os.getenv("DB_PASS", "rag_password")

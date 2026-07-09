@@ -74,7 +74,7 @@ async def generate_suggestions(answer: str, context: str) -> list[str]:
         context_for_prompt = context[:_SUGGESTIONS_ANSWER_MAX_CHARS * 2] if len(context) > _SUGGESTIONS_ANSWER_MAX_CHARS * 2 else context
 
         llm = get_llm()
-        prompt = ChatPromptTemplate.from_messages(PromptManager.get_langchain_messages("suggestions", "llama-3.1-8b-instant"))
+        prompt = ChatPromptTemplate.from_messages(PromptManager.get_langchain_messages("suggestions"))
         chain = prompt | llm | StrOutputParser()
         raw = await chain.ainvoke({
             "answer": answer_for_prompt,
@@ -232,7 +232,7 @@ async def summarize_memory(old_summary: str, new_messages: str) -> str:
     Tóm tắt lịch sử hội thoại cũ và mới thành một bản tóm tắt duy nhất.
     Async để không block event loop của FastAPI.
     """
-    prompt = ChatPromptTemplate.from_messages(PromptManager.get_langchain_messages("memory_summary", "llama-3.1-8b-instant"))
+    prompt = ChatPromptTemplate.from_messages(PromptManager.get_langchain_messages("memory_summary"))
     chain = prompt | get_llm() | StrOutputParser()
 
     return await chain.ainvoke({

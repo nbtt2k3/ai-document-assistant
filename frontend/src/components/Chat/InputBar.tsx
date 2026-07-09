@@ -18,6 +18,7 @@ export default function InputBar({
   onFileSelect,
 }: InputBarProps) {
   const [input, setInput] = useState('');
+  const [isDragging, setIsDragging] = useState(false);
   const fileInputRef = useRef<HTMLInputElement>(null);
 
   const handleSubmit = (e?: React.FormEvent) => {
@@ -43,12 +44,43 @@ export default function InputBar({
     }
   };
 
+  const handleDragOver = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(true);
+  };
+
+  const handleDragLeave = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+  };
+
+  const handleDrop = (e: React.DragEvent) => {
+    e.preventDefault();
+    setIsDragging(false);
+    const file = e.dataTransfer.files?.[0];
+    if (file) {
+      onFileSelect(file);
+    }
+  };
+
   return (
-    <div className={styles.inputContainer}>
+    <div 
+      className={`${styles.inputContainer} ${isDragging ? styles.dragging : ''}`}
+      onDragOver={handleDragOver}
+      onDragLeave={handleDragLeave}
+      onDrop={handleDrop}
+    >
       {isUploading && (
         <div className={styles.uploadingToast}>
-          <div className={styles.spinner} />
-          Đang phân tích và lưu trữ tài liệu...
+          <div className={styles.uploadProgress}>
+            <div className={styles.uploadProgressBar}></div>
+          </div>
+          <span>Đang xử lý tài liệu...</span>
+        </div>
+      )}
+      {isDragging && (
+        <div className={styles.dragOverlay}>
+          Kéo thả file vào đây để tải lên
         </div>
       )}
 

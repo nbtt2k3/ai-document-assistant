@@ -11,6 +11,7 @@ export function useChat(activeSessionId: string | null) {
   const [messages, setMessages] = useState<Message[]>([]);
   const [isStreaming, setIsStreaming] = useState(false);
   const [isUploading, setIsUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
 
   // Tải tin nhắn của một session
   const loadMessages = async (sessionId: string) => {
@@ -24,6 +25,8 @@ export function useChat(activeSessionId: string | null) {
       setMessages(data);
     } catch (e) {
       console.error('loadMessages error:', e);
+      setError('Không thể tải tin nhắn cũ.');
+      setTimeout(() => setError(null), 5000);
     }
   };
 
@@ -41,7 +44,11 @@ export function useChat(activeSessionId: string | null) {
         headers: { Authorization: `Bearer ${token}` },
         body: formData,
       });
-      if (!res.ok) throw new Error('Upload failed');
+      if (!res.ok) {
+        const errData = await res.json().catch(() => null);
+        const errMsg = errData && errData.detail ? errData.detail : 'Upload failed';
+        throw new Error(errMsg);
+      }
 
       setMessages((prev) => [
         ...prev,
@@ -57,7 +64,8 @@ export function useChat(activeSessionId: string | null) {
       }, 500);
     } catch (err: unknown) {
       const msg = err instanceof Error ? err.message : 'Unknown error';
-      alert('Lỗi khi tải file: ' + msg);
+      setError('Lỗi khi tải file: ' + msg);
+      setTimeout(() => setError(null), 5000);
     } finally {
       setIsUploading(false);
     }
@@ -100,7 +108,10 @@ export function useChat(activeSessionId: string | null) {
         body: JSON.stringify({ question: displayQuery }),
       });
 
-      if (!response.ok) throw new Error('API Error');
+      if (!response.ok) {
+        const errData = await response.json().catch(() => null);
+        throw new Error(errData?.detail || 'Lỗi từ server');
+      }
       if (!response.body) throw new Error('No body');
 
       const reader = response.body.getReader();
@@ -213,11 +224,14 @@ export function useChat(activeSessionId: string | null) {
           boundary = buffer.indexOf('\n\n');
         }
       }
-    } catch (err) {
+    } catch (err: unknown) {
+      const msg = err instanceof Error ? err.message : 'Unknown error';
       console.error(err);
+      setError('Lỗi chat: ' + msg);
+      setTimeout(() => setError(null), 5000);
       setMessages((prev) => [
         ...prev,
-        { role: 'bot', content: 'Có lỗi xảy ra khi kết nối tới server.' },
+        { role: 'bot', content: 'Có lỗi xảy ra, vui lòng thử lại.' },
       ]);
     } finally {
       setIsStreaming(false);
@@ -230,6 +244,7 @@ export function useChat(activeSessionId: string | null) {
     messages,
     isStreaming,
     isUploading,
+    error,
     loadMessages,
     uploadFile,
     sendQuery,

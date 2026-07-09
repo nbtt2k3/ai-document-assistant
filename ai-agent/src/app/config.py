@@ -28,11 +28,13 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 STORAGE_DIR      = BASE_DIR / "storage"
 DATA_PATH        = str(STORAGE_DIR / "uploads")
 VECTORSTORE_PATH = str(STORAGE_DIR / "chroma_db")
+DOCSTORE_PATH    = str(STORAGE_DIR / "docstore")
 
 # Tạo thư mục nếu chưa tồn tại
 STORAGE_DIR.mkdir(parents=True, exist_ok=True)
 (STORAGE_DIR / "uploads").mkdir(parents=True, exist_ok=True)
 (STORAGE_DIR / "chroma_db").mkdir(parents=True, exist_ok=True)
+(STORAGE_DIR / "docstore").mkdir(parents=True, exist_ok=True)
 
 # ── API Keys ──────────────────────────────────────────────────────────────────
 # Ưu tiên theo thứ tự: GitHub → OpenRouter → Grok (xAI) → OpenAI → Gemini → Local
@@ -42,6 +44,7 @@ XAI_API_KEY = os.environ.get("XAI_API_KEY", "")
 GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
+LLAMA_CLOUD_API_KEY = os.environ.get("LLAMA_CLOUD_API_KEY", "")
 
 # ── Online Model Names ────────────────────────────────────────────────────────
 GITHUB_LLM_MODEL       = os.environ.get("GITHUB_LLM_MODEL", "gpt-4o")

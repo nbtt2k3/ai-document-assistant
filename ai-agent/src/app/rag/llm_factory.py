@@ -106,3 +106,19 @@ def get_llm():
         )
 
     return _llm_instance
+
+def get_vision_llm():
+    """
+    Trả về Vision LLM dựa trên cấu hình API key có sẵn.
+    Dùng để đọc hiểu hình ảnh/biểu đồ thay cho OCR.
+    """
+    if OPENAI_API_KEY:
+        return ChatOpenAI(model="gpt-4o-mini", api_key=OPENAI_API_KEY, temperature=0.0)
+    elif GEMINI_API_KEY:
+        return ChatGoogleGenerativeAI(model="gemini-2.5-flash", google_api_key=GEMINI_API_KEY, temperature=0.0)
+    # elif GROQ_API_KEY:
+    #     return ChatGroq(model="llama-3.2-11b-vision-preview", groq_api_key=GROQ_API_KEY, temperature=0.0)
+    elif GITHUB_TOKEN:
+        return ChatOpenAI(model="gpt-4o", api_key=GITHUB_TOKEN, base_url="https://models.inference.ai.azure.com", temperature=0.0)
+    
+    return None

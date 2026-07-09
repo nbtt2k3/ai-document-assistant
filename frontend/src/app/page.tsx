@@ -32,6 +32,7 @@ export default function ChatPage() {
     messages,
     isStreaming,
     isUploading,
+    error: chatError,
     loadMessages,
     uploadFile,
     sendQuery,
@@ -115,6 +116,14 @@ export default function ChatPage() {
       {/* Sidebar Overlay (mobile) */}
       {isSidebarOpen && (
         <div className={styles.sidebarOverlay} onClick={() => setIsSidebarOpen(false)} />
+      )}
+
+      {/* Error Toast */}
+      {chatError && (
+        <div className={styles.errorToast}>
+          <AlertTriangle size={18} />
+          {chatError}
+        </div>
       )}
 
       {/* Sidebar */}

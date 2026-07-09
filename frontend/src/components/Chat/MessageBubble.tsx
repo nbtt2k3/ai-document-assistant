@@ -1,6 +1,7 @@
 'use client';
 
 import ReactMarkdown from 'react-markdown';
+import remarkGfm from 'remark-gfm';
 import { Message } from '@/types';
 import styles from '@/app/page.module.css';
 
@@ -40,33 +41,45 @@ export default function MessageBubble({
           ) : isUser ? (
             message.content // Text thô hoặc Markdown nhưng CSS đã ép kiểu plain text
           ) : (
-            <ReactMarkdown>{message.content}</ReactMarkdown>
+            <ReactMarkdown remarkPlugins={[remarkGfm]}>{message.content}</ReactMarkdown>
           )}
         </div>
 
         {/* Sources chips */}
         {message.sources && message.sources.length > 0 && (
-          <div className={`${styles.sourcesContainer} animate-fade-in-up`} style={{ marginTop: '8px', display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
-            {message.sources.map((src, i) => {
-              const fileName = src.file.split(/[/\\]/).pop();
-              return (
-                <div
-                  key={i}
-                  className={styles.sourceChip}
-                  style={{
-                    fontSize: '0.75rem',
-                    padding: '4px 8px',
-                    backgroundColor: 'rgba(255, 255, 255, 0.1)',
-                    border: '1px solid rgba(255, 255, 255, 0.2)',
-                    borderRadius: '4px',
-                    color: '#aaa',
-                  }}
-                  title={src.file}
-                >
-                  📄 {fileName} {src.page && src.page !== '?' ? `(Trang ${src.page})` : ''}
-                </div>
-              );
-            })}
+          <div className={`${styles.sourcesContainer} animate-fade-in-up`} style={{ marginTop: '12px' }}>
+            <div style={{ fontSize: '13px', color: '#a78bfa', marginBottom: '8px', fontWeight: 500 }}>
+              📚 Nguồn tài liệu tham khảo:
+            </div>
+            <div style={{ display: 'flex', flexWrap: 'wrap', gap: '8px' }}>
+              {message.sources.map((src, i) => {
+                const fileName = src.file.split(/[/\\]/).pop();
+                return (
+                  <div
+                    key={i}
+                    className={styles.sourceChip}
+                    style={{
+                      fontSize: '0.75rem',
+                      padding: '6px 10px',
+                      backgroundColor: 'rgba(167, 139, 250, 0.1)',
+                      border: '1px solid rgba(167, 139, 250, 0.3)',
+                      borderRadius: '6px',
+                      color: '#e2e8f0',
+                      cursor: 'default',
+                      display: 'flex',
+                      alignItems: 'center',
+                      gap: '6px'
+                    }}
+                    title={src.file}
+                  >
+                    📄 <span>{fileName}</span>
+                    {src.page && src.page !== '?' ? (
+                      <span style={{ color: '#a78bfa', fontWeight: 'bold' }}> (Tr. {src.page})</span>
+                    ) : ''}
+                  </div>
+                );
+              })}
+            </div>
           </div>
         )}
 

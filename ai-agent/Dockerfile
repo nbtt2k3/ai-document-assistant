@@ -13,7 +13,7 @@ WORKDIR /app
 
 COPY requirements.txt .
 
-RUN pip install --no-cache-dir --use-deprecated=legacy-resolver -r requirements.txt
+RUN pip install --default-timeout=1000 --no-cache-dir --use-deprecated=legacy-resolver -r requirements.txt
 
 COPY . .
 

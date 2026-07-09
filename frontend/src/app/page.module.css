@@ -300,19 +300,64 @@
 
 .uploadingToast {
   position: absolute;
-  top: -40px;
+  top: -45px;
+  left: 50%;
+  transform: translateX(-50%);
+  background: rgba(30, 32, 40, 0.95);
+  border: 1px solid var(--glass-border);
+  color: var(--text-primary);
+  padding: 10px 16px;
+  border-radius: 12px;
+  font-size: 14px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.2);
+  animation: fadeInUp 0.3s ease-out;
+  backdrop-filter: blur(8px);
+  -webkit-backdrop-filter: blur(8px);
+}
+
+.uploadProgress {
+  width: 100px;
+  height: 4px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 2px;
+  overflow: hidden;
+}
+
+.uploadProgressBar {
+  height: 100%;
+  background: var(--accent-color);
+  width: 50%; /* Indeterminate for now */
+  border-radius: 2px;
+  animation: progressIndeterminate 1.5s infinite linear;
+  transform-origin: 0% 50%;
+}
+
+@keyframes progressIndeterminate {
+  0% { transform: translateX(0) scaleX(0); }
+  40% { transform: translateX(0) scaleX(0.4); }
+  100% { transform: translateX(100%) scaleX(0.5); }
+}
+
+.dragging {
+  background: linear-gradient(to top, rgba(99, 102, 241, 0.1) 70%, transparent);
+}
+
+.dragOverlay {
+  position: absolute;
+  top: -60px;
   left: 50%;
   transform: translateX(-50%);
   background: var(--accent-color);
   color: white;
-  padding: 8px 16px;
-  border-radius: 20px;
-  font-size: 14px;
-  display: flex;
-  align-items: center;
-  gap: 8px;
-  box-shadow: 0 4px 12px rgba(99, 102, 241, 0.4);
-  animation: fadeInUp 0.3s ease-out;
+  padding: 12px 24px;
+  border-radius: 24px;
+  font-weight: 500;
+  box-shadow: 0 8px 24px rgba(99, 102, 241, 0.4);
+  pointer-events: none;
+  animation: fadeInUp 0.2s ease-out;
 }
 
 /* Thinking Indicator */
@@ -422,6 +467,25 @@
   padding: 0.2rem 0.4rem;
   border-radius: 6px;
   font-size: 0.9em;
+}
+
+/* Markdown Tables */
+.message.bot table {
+  width: 100%;
+  border-collapse: collapse;
+  margin: 1rem 0;
+  color: #f8fafc;
+  font-size: 0.95em;
+}
+.message.bot th, .message.bot td {
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  padding: 10px 14px;
+  text-align: left;
+}
+.message.bot th {
+  background: rgba(255, 255, 255, 0.1);
+  font-weight: 600;
+  color: #a78bfa;
 }
 
 /* --- Mobile Header & Responsive Sidebar --- */
@@ -630,4 +694,25 @@
 @keyframes slideUp {
   from { opacity: 0; transform: translateY(20px) scale(0.95); }
   to { opacity: 1; transform: translateY(0) scale(1); }
+}
+
+.errorToast {
+  position: fixed;
+  top: 24px;
+  right: 24px;
+  background: #ef4444;
+  color: white;
+  padding: 12px 20px;
+  border-radius: 8px;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  box-shadow: 0 4px 12px rgba(239, 68, 68, 0.4);
+  z-index: 9999;
+  animation: slideInRight 0.3s ease-out;
+}
+
+@keyframes slideInRight {
+  from { opacity: 0; transform: translateX(50px); }
+  to { opacity: 1; transform: translateX(0); }
 }

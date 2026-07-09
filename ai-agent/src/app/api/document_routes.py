@@ -38,10 +38,14 @@ async def internal_ingest(session_id: str, file: UploadFile = File(...)):
 
     file_path = save_upload_file(session_id, file.filename, content)
 
+    from starlette.concurrency import run_in_threadpool
+
     try:
-        num_segments = process_upload(session_id, file_path, file.filename)
+        num_segments = await run_in_threadpool(process_upload, session_id, file_path, file.filename)
         return {"num_segments": num_segments}
     except Exception as e:
+        import traceback
+        traceback.print_exc()
         raise HTTPException(status_code=500, detail=str(e))
 
 

@@ -12,4 +12,7 @@ sqlalchemy
 psycopg2-binary
 passlib[bcrypt]
 python-jose[cryptography]
-python-multipart
+python-multipart
+
+# Rate limiting
+slowapi

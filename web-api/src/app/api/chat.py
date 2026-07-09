@@ -1,5 +1,5 @@
 import httpx
-from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks
+from fastapi import APIRouter, Depends, HTTPException, BackgroundTasks, Request
 from fastapi.responses import StreamingResponse
 from sqlalchemy.orm import Session
 import json
@@ -10,6 +10,7 @@ from src.app.models.session import Session as DBSession
 from src.app.models.message import Message as DBMessage
 from src.app.core.security import get_current_user_id
 from src.app.schemas.chat import ChatRequest, SummarizeSectionRequest
+from src.app.core.rate_limit import limiter
 
 router = APIRouter(prefix="/api/sessions", tags=["Chat"])
 
@@ -65,9 +66,11 @@ async def summarize_memory_task(session_id: str):
 
 
 @router.post("/{session_id}/chat")
+@limiter.limit("20/minute")
 async def chat_endpoint(
+    request: Request,
     session_id: str,
-    request: ChatRequest,
+    payload: ChatRequest,
     background_tasks: BackgroundTasks,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
@@ -80,11 +83,11 @@ async def chat_endpoint(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    if not request.question:
+    if not payload.question:
         raise HTTPException(status_code=400, detail="Question is required")
 
-    is_system = request.question.startswith("[SYSTEM] ")
-    actual_question = request.question.replace("[SYSTEM] ", "") if is_system else request.question
+    is_system = payload.question.startswith("[SYSTEM] ")
+    actual_question = payload.question.replace("[SYSTEM] ", "") if is_system else payload.question
 
     if not is_system:
         user_msg = DBMessage(session_id=session_id, role="user", content=actual_question)
@@ -113,13 +116,13 @@ async def chat_endpoint(
     background_tasks.add_task(summarize_memory_task, session_id)
 
     async def wrapped_stream():
-        payload = {
+        ai_payload = {
             "session_id": session_id,
             "question": actual_question,
             "history_text": history_text
         }
         async with httpx.AsyncClient(timeout=None) as client:
-            async with client.stream("POST", f"{AI_AGENT_URL}/internal/chat", json=payload) as response:
+            async with client.stream("POST", f"{AI_AGENT_URL}/internal/chat", json=ai_payload) as response:
                 async for chunk in response.aiter_lines():
                     if chunk:
                         sse_string = chunk + "\n\n"
@@ -147,9 +150,11 @@ async def chat_endpoint(
 
 
 @router.post("/{session_id}/summarize_section")
+@limiter.limit("10/minute")
 async def summarize_section_endpoint(
+    request: Request,
     session_id: str,
-    request: SummarizeSectionRequest,
+    payload: SummarizeSectionRequest,
     db: Session = Depends(get_db),
     user_id: int = Depends(get_current_user_id),
 ):
@@ -161,18 +166,18 @@ async def summarize_section_endpoint(
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
 
-    actual_question = f"Hãy tóm tắt chi tiết toàn bộ nội dung của phần/chương có tên là: '{request.section_title}'."
+    actual_question = f"Hãy tóm tắt chi tiết toàn bộ nội dung của phần/chương có tên là: '{payload.section_title}'."
 
     async def wrapped_stream():
-        payload = {
+        ai_payload = {
             "session_id": session_id,
             "question": actual_question,
             "history_text": "",
-            "section_title": request.section_title,
-            "level": request.level
+            "section_title": payload.section_title,
+            "level": payload.level
         }
         async with httpx.AsyncClient(timeout=None) as client:
-            async with client.stream("POST", f"{AI_AGENT_URL}/internal/chat", json=payload) as response:
+            async with client.stream("POST", f"{AI_AGENT_URL}/internal/chat", json=ai_payload) as response:
                 async for chunk in response.aiter_lines():
                     if chunk:
                         sse_string = chunk + "\n\n"

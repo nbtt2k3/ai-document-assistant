@@ -21,33 +21,51 @@ class CustomPDFLoader:
 
     def load(self) -> list[Document]:
         import fitz
-        import pymupdf4llm
+        from src.app.config import LLAMA_CLOUD_API_KEY
 
         docs = []
         try:
-            # 1. Trích xuất markdown (per-page)
-            try:
-                page_chunks = pymupdf4llm.to_markdown(self.file_path, page_chunks=True)
-                for chunk in page_chunks:
-                    # page metadata của pymupdf4llm là 1-based
-                    page_num = chunk.get("metadata", {}).get("page", 0)
-                    text = chunk.get("text", "")
-                    if text.strip():
-                        docs.append(Document(
-                            page_content=text,
-                            metadata={"source": self.file_path, "page": page_num}
-                        ))
-            except Exception as e:
-                print(f"  [ERROR] Lỗi dùng pymupdf4llm: {e}")
-                # Fallback: dùng PyMuPDF trực tiếp
-                with fitz.open(self.file_path) as doc_fallback:
-                    for i, page in enumerate(doc_fallback):
-                        text = page.get_text()
+            # 1. Trích xuất text/markdown
+            if LLAMA_CLOUD_API_KEY:
+                print("  [INFO] Dùng LlamaParse để xử lý bố cục phức tạp...")
+                import nest_asyncio
+                nest_asyncio.apply()
+                from llama_parse import LlamaParse
+                
+                parser = LlamaParse(
+                    api_key=LLAMA_CLOUD_API_KEY,
+                    result_type="markdown"
+                )
+                llama_docs = parser.load_data(self.file_path)
+                for i, d in enumerate(llama_docs):
+                    docs.append(Document(
+                        page_content=d.text,
+                        metadata={"source": self.file_path, "page": i + 1}
+                    ))
+            else:
+                import pymupdf4llm
+                try:
+                    page_chunks = pymupdf4llm.to_markdown(self.file_path, page_chunks=True)
+                    for chunk in page_chunks:
+                        # page metadata của pymupdf4llm là 1-based
+                        page_num = chunk.get("metadata", {}).get("page", 0)
+                        text = chunk.get("text", "")
                         if text.strip():
                             docs.append(Document(
                                 page_content=text,
-                                metadata={"source": self.file_path, "page": i + 1}
+                                metadata={"source": self.file_path, "page": page_num}
                             ))
+                except Exception as e:
+                    print(f"  [ERROR] Lỗi dùng pymupdf4llm: {e}")
+                    # Fallback: dùng PyMuPDF trực tiếp
+                    with fitz.open(self.file_path) as doc_fallback:
+                        for i, page in enumerate(doc_fallback):
+                            text = page.get_text()
+                            if text.strip():
+                                docs.append(Document(
+                                    page_content=text,
+                                    metadata={"source": self.file_path, "page": i + 1}
+                                ))
 
             # 2. Xử lý ảnh nhúng (OCR) và nối vào trang tương ứng
             with fitz.open(self.file_path) as doc_fitz:

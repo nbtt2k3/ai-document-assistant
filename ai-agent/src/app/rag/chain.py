@@ -60,7 +60,13 @@ def get_base_retriever(session_id: str, section_title: str = None, level: int = 
         retriever=base_retriever, llm=llm
     )
 
-    compressor = FlashrankRerank(top_n=RERANK_TOP_N)
+    # Khởi tạo trực tiếp Ranker để ép dùng cache_dir vĩnh viễn, tránh flashrank tự xoá /tmp và tải lại
+    from flashrank import Ranker
+    from langchain_community.document_compressors.flashrank_rerank import DEFAULT_MODEL_NAME
+    
+    ranker_client = Ranker(model_name=DEFAULT_MODEL_NAME, cache_dir="/app/flashrank_cache")
+    compressor = FlashrankRerank(client=ranker_client, top_n=RERANK_TOP_N)
+    
     retriever = ContextualCompressionRetriever(
         base_compressor=compressor, base_retriever=intermediate_retriever
     )

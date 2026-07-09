@@ -28,6 +28,36 @@ vectorstore/
 
 # IDE
 .vscode/
+# Python
+__pycache__/
+*.py[cod]
+*.pyo
+*.pyd
+*.so
+*.egg
+*.egg-info/
+dist/
+build/
+.eggs/
+
+# Virtual environment
+.venv/
+venv/
+env/
+
+# Environment variables (chứa secrets, không commit)
+.env
+
+# Storage runtime (uploads & vector DB — dữ liệu người dùng, không commit)
+storage/uploads/
+storage/chroma_db/
+
+# Data & vectorstore cũ (nếu còn tồn tại)
+data/
+vectorstore/
+
+# IDE
+.vscode/
 .idea/
 
 # OS
@@ -36,3 +66,6 @@ Thumbs.db
 
 # Logs
 *.log
+flashrank_cache/
+*.zip
+storage/
