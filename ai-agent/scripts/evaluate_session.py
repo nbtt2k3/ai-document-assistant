@@ -56,6 +56,7 @@ def get_session_messages(session_id=None):
         
         qa_pairs = []
         current_q = None
+        history_list = []
         
         for msg in messages:
             # Bỏ qua tin nhắn hệ thống (upload file)
@@ -82,11 +83,17 @@ def get_session_messages(session_id=None):
                             context_parts.append(text)
                     context_str = "\n".join(context_parts)
                 
+                history_str = ""
+                for h_q, h_a in history_list[-3:]: # Lấy tối đa 3 cặp gần nhất làm ngữ cảnh
+                    history_str += f"User: {h_q}\nAI: {h_a}\n"
+                
                 qa_pairs.append({
                     "question": current_q,
                     "answer": msg['content'],
-                    "context": context_str
+                    "context": context_str,
+                    "chat_history": history_str if history_str else "(Không có)"
                 })
+                history_list.append((current_q, msg['content']))
                 current_q = None # Reset
                 
         return qa_pairs
@@ -103,8 +110,9 @@ async def evaluate_pair(qa, llm, prompt):
     try:
         score = await chain.ainvoke({
             "question": qa["question"],
-            "context": qa["context"] if qa["context"] else "(Không có tài liệu truy xuất)",
-            "answer": qa["answer"]
+            "context": qa["context"] if qa["context"] else "(Không có tài liệu truy xuất riêng cho câu này)",
+            "answer": qa["answer"],
+            "chat_history": qa["chat_history"]
         })
         return score
     except Exception as e:
@@ -134,13 +142,16 @@ async def main():
         max_retries=5,
     )
     eval_prompt = ChatPromptTemplate.from_template('''Bạn là một giám khảo chuyên gia chấm điểm hệ thống RAG (Retrieval-Augmented Generation).
-Hãy đọc CÂU HỎI, TÀI LIỆU, và CÂU TRẢ LỜI bên dưới, sau đó chấm điểm từ 0.0 đến 1.0 cho 2 tiêu chí sau:
-1. "faithfulness": Độ trung thực. Câu trả lời có được rút ra trực tiếp từ TÀI LIỆU không? (AI được phép diễn đạt lại bằng từ đồng nghĩa hoặc giải thích logic, ví dụ: "không để cùng nơi" -> "để riêng biệt". Không trừ điểm vì việc diễn đạt lại này). Tuy nhiên, nếu AI tự bịa ra một hướng dẫn hoặc quy trình không hề có trong tài liệu, phải phạt nặng (0.0 - 0.5). Nếu AI từ chối trả lời vì tài liệu thiếu thông tin, hãy cho 1.0. 
-2. "answer_relevancy": Độ bám sát. Câu trả lời có giải quyết đúng trọng tâm CÂU HỎI không? Nếu câu hỏi không thể trả lời từ tài liệu và AI từ chối, hãy cho 1.0. (1.0 = Rất đúng trọng tâm/từ chối đúng, 0.0 = Lạc đề).
+Hãy đọc LỊCH SỬ TRÒ CHUYỆN, CÂU HỎI HIỆN TẠI, TÀI LIỆU, và CÂU TRẢ LỜI bên dưới, sau đó chấm điểm từ 0.0 đến 1.0 cho 2 tiêu chí sau:
+1. "faithfulness": Độ trung thực. Câu trả lời có được rút ra trực tiếp từ TÀI LIỆU không? (AI được phép diễn đạt lại, suy luận logic dựa trên tài liệu). QUAN TRỌNG: Nếu câu hỏi là câu hỏi tiếp nối (follow-up) và AI trả lời dựa vào thông tin đã thảo luận trong LỊCH SỬ TRÒ CHUYỆN, hãy cho 1.0. Nếu AI tự bịa ra thông tin không có trong TÀI LIỆU lẫn LỊCH SỬ TRÒ CHUYỆN, phạt nặng (0.0 - 0.5). Nếu AI từ chối trả lời vì thiếu thông tin, hãy cho 1.0. 
+2. "answer_relevancy": Độ bám sát. Câu trả lời có giải quyết đúng trọng tâm CÂU HỎI HIỆN TẠI không? Nếu câu hỏi không thể trả lời và AI từ chối, hãy cho 1.0. (1.0 = Rất đúng trọng tâm/từ chối đúng, 0.0 = Lạc đề).
 
-CÂU HỎI: {question}
-TÀI LIỆU: {context}
-CÂU TRẢ LỜI: {answer}
+LỊCH SỬ TRÒ CHUYỆN TÓM TẮT (3 câu gần nhất): 
+{chat_history}
+
+CÂU HỎI HIỆN TẠI: {question}
+TÀI LIỆU TRÍCH XUẤT (Cho riêng câu hỏi này): {context}
+CÂU TRẢ LỜI CỦA AI: {answer}
 
 QUAN TRỌNG: Bạn PHẢI suy luận (reasoning) cẩn thận trước khi đưa ra điểm số. 
 Trả về KẾT QUẢ DƯỚI DẠNG JSON với chính xác 5 trường (fields) sau:

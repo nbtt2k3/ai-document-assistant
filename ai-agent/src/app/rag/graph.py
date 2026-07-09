@@ -139,7 +139,7 @@ def create_crag_graph(session_id: str, section_title: str = None, level: int = N
         reduce_chain = reduce_prompt | llm.with_config(tags=["final_generation"]) | StrOutputParser()
         
         final_summary = await reduce_chain.ainvoke({"summaries": combined_summaries, "question": state["question"]}, config)
-        return {"generation": final_summary}
+        return {"generation": final_summary, "documents": docs}
 
     async def translate_node(state: GraphState, config: RunnableConfig):
         prompt = ChatPromptTemplate.from_messages(PromptManager.get_langchain_messages("translate"))

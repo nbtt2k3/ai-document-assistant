@@ -156,7 +156,7 @@ async def create_event_stream(
                     yield f"data: {data_thought}\n\n"
 
             # Bắt output của node retrieve để lấy documents
-            if event["event"] == "on_chain_end" and event.get("name") in ["retrieve", "retrieve_for_summarize", "retrieve_for_translate"]:
+            if event["event"] == "on_chain_end" and event.get("name") in ["retrieve", "retrieve_for_summarize", "retrieve_for_translate", "summarize"]:
                 output = event.get("data", {}).get("output", {})
                 if isinstance(output, dict) and "documents" in output:
                     retrieved_docs = output["documents"]
