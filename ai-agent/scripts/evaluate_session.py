@@ -140,8 +140,9 @@ TÀI LIỆU: {context}
 CÂU TRẢ LỜI: {answer}
 
 QUAN TRỌNG: Bạn PHẢI suy luận (reasoning) cẩn thận trước khi đưa ra điểm số. 
-Trả về KẾT QUẢ DƯỚI DẠNG JSON với chính xác 4 trường (fields) sau:
+Trả về KẾT QUẢ DƯỚI DẠNG JSON với chính xác 5 trường (fields) sau:
 {{
+  "is_chitchat": <boolean: true nếu CÂU HỎI chỉ là chào hỏi, cảm ơn, hoặc giao tiếp xã giao thuần túy không hỏi thông tin>,
   "reasoning_faithfulness": "<Giải thích tại sao bạn chấm điểm faithfulness như vậy>",
   "faithfulness": <float từ 0.0 đến 1.0>,
   "reasoning_relevancy": "<Giải thích tại sao bạn chấm điểm answer_relevancy như vậy>",
@@ -151,12 +152,18 @@ Trả về KẾT QUẢ DƯỚI DẠNG JSON với chính xác 4 trường (fields
 
     total_faith = 0
     total_rel = 0
+    evaluated_count = 0
     
     for i, qa in enumerate(qa_pairs, 1):
         print(f"Đang chấm điểm câu {i}/{len(qa_pairs)}...")
         print(f" Q: {qa['question']}")
         
         scores = await evaluate_pair(qa, eval_llm, eval_prompt)
+        
+        if scores.get("is_chitchat", False):
+            print(" => Bỏ qua chấm điểm vì đây là câu hỏi giao tiếp xã giao (Chitchat).\n")
+            continue
+            
         faith = float(scores.get("faithfulness", 0.0))
         rel = float(scores.get("answer_relevancy", 0.0))
         reasoning_faith = scores.get("reasoning_faithfulness", "")
@@ -164,6 +171,7 @@ Trả về KẾT QUẢ DƯỚI DẠNG JSON với chính xác 4 trường (fields
         
         total_faith += faith
         total_rel += rel
+        evaluated_count += 1
         
         print(f" => Faithfulness: {faith:.2f} | Relevancy: {rel:.2f}")
         if reasoning_faith or reasoning_rel:
@@ -173,15 +181,19 @@ Trả về KẾT QUẢ DƯỚI DẠNG JSON với chính xác 4 trường (fields
             print("\n")
         
     # Tổng kết
-    avg_faith = total_faith / len(qa_pairs)
-    avg_rel = total_rel / len(qa_pairs)
+    if evaluated_count == 0:
+        print("Không có câu hỏi RAG nào để chấm điểm (toàn bộ là Chitchat).")
+        return
+        
+    avg_faith = total_faith / evaluated_count
+    avg_rel = total_rel / evaluated_count
     
     print("=" * 60)
     print(" 🏆 BÁO CÁO TỔNG HỢP (BATCH EVALUATION)")
     print("=" * 60)
-    print(f" Số lượng câu hỏi đã chấm : {len(qa_pairs)}")
-    print(f" Trung bình Độ trung thực : {avg_faith:.2f} / 1.00")
-    print(f" Trung bình Độ bám sát    : {avg_rel:.2f} / 1.00")
+    print(f" Số lượng câu hỏi RAG đã chấm : {evaluated_count} / {len(qa_pairs)}")
+    print(f" Trung bình Độ trung thực     : {avg_faith:.2f} / 1.00")
+    print(f" Trung bình Độ bám sát        : {avg_rel:.2f} / 1.00")
     print("=" * 60)
     
     if avg_faith < 0.8:

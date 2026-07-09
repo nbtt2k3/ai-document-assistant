@@ -131,7 +131,25 @@ export function useChat(activeSessionId: string | null) {
             try {
               const parsed = JSON.parse(dataStr);
 
-              if (parsed.type === 'chunk') {
+              if (parsed.type === 'thought') {
+                // Streaming: hiển thị luồng suy nghĩ của AI
+                botResponse = botResponse + `> _${parsed.content}_\n\n`;
+                setMessages((prev) => {
+                  const updated = [...prev];
+                  for (let i = updated.length - 1; i >= 0; i--) {
+                    if (updated[i].role === 'bot') {
+                      updated[i] = {
+                        ...updated[i],
+                        content: botResponse,
+                        isThinking: false,
+                      };
+                      break;
+                    }
+                  }
+                  return updated;
+                });
+
+              } else if (parsed.type === 'chunk') {
                 // Streaming: hiển thị raw content, chưa có suggestions
                 botResponse = botResponse + parsed.content;
                 setMessages((prev) => {

@@ -1,16 +1,23 @@
 """
 rag/graph.py — CRAG (Self-Corrective RAG) implementation using LangGraph.
 """
-from typing import TypedDict, List
+from typing import TypedDict, List, Literal
 from langgraph.graph import StateGraph, END
 from langchain_core.documents import Document
 from langchain_core.prompts import ChatPromptTemplate
 from langchain_core.output_parsers import StrOutputParser
 from langchain_core.runnables import RunnableConfig
+from pydantic import BaseModel, Field
 
 from src.app.rag.llm_factory import get_llm
 from src.app.prompts.prompt_manager import PromptManager
 from src.app.rag.utils import format_docs
+
+class RouteIntent(BaseModel):
+    intent: Literal["RAG", "CHITCHAT", "SUMMARIZE", "TRANSLATE"] = Field(
+        description="The classified intent of the user's question."
+    )
+
 
 class GraphState(TypedDict):
     session_id: str
@@ -28,9 +35,10 @@ def create_crag_graph(session_id: str, section_title: str = None, level: int = N
 
     async def route_question(state: GraphState):
         prompt = ChatPromptTemplate.from_messages(PromptManager.get_langchain_messages("router", "llama-3.1-8b-instant"))
-        chain = prompt | llm | StrOutputParser()
-        intent = await chain.ainvoke({"question": state["question"], "chat_history": state["chat_history"]})
-        intent = intent.strip().upper()
+        structured_llm = llm.with_structured_output(RouteIntent)
+        chain = prompt | structured_llm
+        result = await chain.ainvoke({"question": state["question"], "chat_history": state["chat_history"]})
+        intent = result.intent
         print(f"[ROUTER] Question: '{state['question']}' -> Intent: {intent}")
         return {"intent": intent}
 

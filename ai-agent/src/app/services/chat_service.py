@@ -132,7 +132,29 @@ async def create_event_stream(
     try:
         inputs = {"question": question, "chat_history": history_text}
 
+        # Định nghĩa các thông báo suy nghĩ cho từng Node
+        NODE_THOUGHTS = {
+            "route_question": "🧠 Đang phân tích ý định câu hỏi...",
+            "retrieve": "🔍 Đang lục tìm tài liệu liên quan...",
+            "retrieve_for_summarize": "🔍 Đang lục tìm tài liệu liên quan...",
+            "retrieve_for_translate": "🔍 Đang lục tìm tài liệu liên quan...",
+            "grade_documents": "⚖️ Đang đánh giá độ chính xác của tài liệu tìm được...",
+            "rewrite_query": "🔄 Tài liệu chưa đủ tốt, đang viết lại câu hỏi tìm kiếm sâu hơn...",
+            "generate_rag": "📝 Đang tổng hợp câu trả lời cuối cùng...",
+            "summarize": "📝 Đang tiến hành tóm tắt văn bản...",
+            "translate": "📝 Đang dịch thuật văn bản...",
+            "chitchat": "💬 Đang tạo phản hồi..."
+        }
+
         async for event in graph.astream_events(inputs, version="v2"):
+            # Bắt sự kiện bắt đầu một Node để stream 'thought'
+            if event["event"] == "on_chain_start":
+                node_name = event.get("name")
+                if node_name in NODE_THOUGHTS:
+                    thought_msg = NODE_THOUGHTS[node_name]
+                    data_thought = json.dumps({"type": "thought", "content": thought_msg}, ensure_ascii=False)
+                    yield f"data: {data_thought}\n\n"
+
             # Bắt output của node retrieve để lấy documents
             if event["event"] == "on_chain_end" and event.get("name") in ["retrieve", "retrieve_for_summarize", "retrieve_for_translate"]:
                 output = event.get("data", {}).get("output", {})

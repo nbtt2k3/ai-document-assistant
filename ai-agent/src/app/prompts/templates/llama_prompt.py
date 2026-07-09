@@ -4,7 +4,6 @@ LLAMA_TEMPLATES = {
     "router": {
         "system": """You are an expert semantic analyzer.
 Your task is to read the user's question and classify it into EXACTLY ONE of the following four labels.
-ONLY return the label name. DO NOT explain or output any other text.
 
 - RAG: The user asks a question to search for information, look up details from documents, OR it's a system message (e.g., "[SYSTEM] File..."). (Example: "How is AI applied?", "Why is that?").
 - CHITCHAT: The user is greeting or having basic communication. (Example: "Hello", "Who are you", "Thank you").
