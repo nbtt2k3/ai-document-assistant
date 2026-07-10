@@ -13,6 +13,7 @@ from src.app.config import (
 # Khởi tạo embedder linh hoạt (Singleton pattern)
 _embedder = None
 
+
 def get_embedder():
     """Trả về embedding model cục bộ bằng Ollama mặc định."""
     global _embedder
@@ -21,7 +22,7 @@ def get_embedder():
 
     print(f"[INFO] Dang su dung Embedder Local: Ollama ({EMBEDDING_MODEL})")
     _embedder = OllamaEmbeddings(
-        model=EMBEDDING_MODEL, 
+        model=EMBEDDING_MODEL,
         base_url=OLLAMA_BASE_URL
     )
 

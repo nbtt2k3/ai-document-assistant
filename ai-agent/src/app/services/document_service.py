@@ -64,9 +64,13 @@ def save_upload_file(session_id: str, filename: str, content: bytes) -> str:
     Returns:
         Đường dẫn tuyệt đối của file đã lưu.
     """
+    safe_filename = Path(filename).name
+    if not safe_filename or safe_filename in {".", ".."}:
+        raise ValueError("Tên file không hợp lệ.")
+
     session_dir = os.path.join(DATA_PATH, session_id)
     os.makedirs(session_dir, exist_ok=True)
-    file_path = os.path.join(session_dir, filename)
+    file_path = os.path.join(session_dir, safe_filename)
     with open(file_path, "wb") as f:
         f.write(content)
     return file_path

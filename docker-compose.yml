@@ -12,9 +12,17 @@ services:
     volumes:
       - ./web-api:/app
     environment:
-      - DATABASE_URL=postgresql://rag_user:rag_password@db:5432/rag_db
-      - SECRET_KEY=supper_secret_key_change_me_in_production
-      - AI_AGENT_URL=http://ai-agent:8001
+      # Database
+      DATABASE_URL: postgresql://rag_user:rag_password@db:5432/rag_db
+
+      # Auth
+      SECRET_KEY: supper_secret_key_change_me_in_production
+
+      # Internal services
+      AI_AGENT_URL: http://ai-agent:8001
+
+      # Browser clients
+      ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
 
   ai-agent:
     build: 
@@ -26,10 +34,23 @@ services:
       - ./ai-agent:/app
       - paddle_models:/root/.paddleocr
     environment:
-      # If using local ollama on host machine, we need to be able to reach host.
-      - OLLAMA_BASE_URL=http://host.docker.internal:11434
-      - HF_ENDPOINT=https://hf-mirror.com
-      - FLASHRANK_CACHE=/app/flashrank_cache
+      # Runtime paths inside the container
+      STORAGE_DIR: /app/storage
+      DATA_PATH: /app/storage/uploads
+      VECTORSTORE_PATH: /app/storage/chroma_db
+      DOCSTORE_PATH: /app/storage/docstore
+      FLASHRANK_CACHE: /app/flashrank_cache
+
+      # Local models on the host machine
+      OLLAMA_BASE_URL: http://host.docker.internal:11434
+      OLLAMA_LLM_MODEL: llama3.1:8b
+      OLLAMA_EMBEDDING_MODEL: bge-m3
+
+      # Download mirrors
+      HF_ENDPOINT: https://hf-mirror.com
+
+      # Browser/API clients
+      ALLOWED_ORIGINS: http://localhost:3000,http://localhost:8000,http://web-api:8000
     extra_hosts:
       - "host.docker.internal:host-gateway"
 

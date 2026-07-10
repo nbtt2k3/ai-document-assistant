@@ -17,11 +17,11 @@ from langchain_community.document_compressors.flashrank_rerank import FlashrankR
 from langchain_core.documents import Document
 from langchain_core.retrievers import BaseRetriever
 
-from src.app.rag.llm_factory import get_llm
+from src.app.rag.llm_factory import get_llm, is_online_llm
 
 from src.app.rag.vectorstore import get_retriever_for_session
 from src.app.rag.bm25 import get_bm25_results
-from src.app.config import RERANK_TOP_N
+from src.app.config import FLASHRANK_CACHE_PATH, RERANK_TOP_N
 
 
 # ── BM25 Retriever wrapper ─────────────────────────────────────────────────────
@@ -54,17 +54,21 @@ def get_base_retriever(session_id: str, section_title: str = None, level: int = 
 
     llm = get_llm()
 
-    # MultiQueryRetriever sinh nhiều biến thể câu hỏi để tăng recall
-    # Singleton LLM đảm bảo không tạo thêm CUDA context dù gọi nhiều lần
-    intermediate_retriever = MultiQueryRetriever.from_llm(
-        retriever=base_retriever, llm=llm
-    )
+    # Chỉ bật MultiQueryRetriever khi dùng LLM online; local Ollama giữ pipeline ngắn hơn.
+    if is_online_llm():
+        # MultiQueryRetriever sinh nhiều biến thể câu hỏi để tăng recall
+        # Singleton LLM đảm bảo không tạo thêm CUDA context dù gọi nhiều lần
+        intermediate_retriever = MultiQueryRetriever.from_llm(
+            retriever=base_retriever, llm=llm
+        )
+    else:
+        intermediate_retriever = base_retriever
 
     # Khởi tạo trực tiếp Ranker để ép dùng cache_dir vĩnh viễn, tránh flashrank tự xoá /tmp và tải lại
     from flashrank import Ranker
     from langchain_community.document_compressors.flashrank_rerank import DEFAULT_MODEL_NAME
     
-    ranker_client = Ranker(model_name=DEFAULT_MODEL_NAME, cache_dir="/app/flashrank_cache")
+    ranker_client = Ranker(model_name=DEFAULT_MODEL_NAME, cache_dir=FLASHRANK_CACHE_PATH)
     compressor = FlashrankRerank(client=ranker_client, top_n=RERANK_TOP_N)
     
     retriever = ContextualCompressionRetriever(

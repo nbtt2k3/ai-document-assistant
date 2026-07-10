@@ -2,7 +2,7 @@
 
 import { useState } from 'react';
 import { useRouter } from 'next/navigation';
-import { setAuthToken } from '@/lib/api';
+import { BASE_URL, setAuthToken } from '@/lib/api';
 import styles from './login.module.css';
 
 export default function LoginPage() {
@@ -25,7 +25,7 @@ export default function LoginPage() {
         formData.append('username', username);
         formData.append('password', password);
 
-        const res = await fetch('http://127.0.0.1:8000/api/auth/login', {
+        const res = await fetch(`${BASE_URL}/auth/login`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/x-www-form-urlencoded',
@@ -42,7 +42,7 @@ export default function LoginPage() {
         router.push('/');
       } else {
         // Register uses JSON
-        const res = await fetch('http://127.0.0.1:8000/api/auth/register', {
+        const res = await fetch(`${BASE_URL}/auth/register`, {
           method: 'POST',
           headers: {
             'Content-Type': 'application/json',

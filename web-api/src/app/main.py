@@ -7,7 +7,7 @@ from src.app.db.database import engine, Base
 from src.app.models import User, Session as DBSession, Message  # noqa: F401
 from src.app.api import auth, sessions, chat
 
-from src.app.core.config import ALLOWED_ORIGINS
+from src.app.core.config import ALLOWED_ORIGINS, ALLOWED_ORIGIN_REGEX
 from src.app.core.rate_limit import limiter
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
@@ -24,6 +24,7 @@ app = FastAPI(title="AI Document Assistant API")
 app.add_middleware(
     CORSMiddleware,
     allow_origins=ALLOWED_ORIGINS,
+    allow_origin_regex=ALLOWED_ORIGIN_REGEX,
     allow_credentials=True,
     allow_methods=["*"],
     allow_headers=["*"],

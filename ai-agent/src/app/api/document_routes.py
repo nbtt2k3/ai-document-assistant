@@ -25,10 +25,9 @@ async def internal_ingest(session_id: str, file: UploadFile = File(...)):
             detail=f"Định dạng '{ext}' không được hỗ trợ."
         )
 
-    content = await file.read()
-
     # Kiểm tra kích thước file — tránh OOM khi xử lý file quá lớn
     max_bytes = MAX_FILE_SIZE_MB * 1024 * 1024
+    content = await file.read(max_bytes + 1)
     if len(content) > max_bytes:
         raise HTTPException(
             status_code=413,

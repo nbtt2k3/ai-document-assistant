@@ -19,3 +19,9 @@ AI_AGENT_URL = os.getenv("AI_AGENT_URL", "http://ai-agent:8001")
 # Cấu hình CORS
 ALLOWED_ORIGINS_STR = os.getenv("ALLOWED_ORIGINS", "http://localhost:3000,http://127.0.0.1:3000")
 ALLOWED_ORIGINS = [origin.strip() for origin in ALLOWED_ORIGINS_STR.split(",") if origin.strip()]
+
+# Cho phép dev truy cập từ localhost và IP LAN (vd: http://192.168.187.1:3000)
+ALLOWED_ORIGIN_REGEX = os.getenv(
+	"ALLOWED_ORIGIN_REGEX",
+	r"^https?://(localhost|127\.0\.0\.1|192\.168\.\d+\.\d+):3000$",
+)

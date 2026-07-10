@@ -25,16 +25,17 @@ BASE_DIR = Path(__file__).resolve().parents[2]
 
 # ── Đường dẫn storage runtime ─────────────────────────────────────────────────
 # Tất cả dữ liệu runtime nằm trong storage/ (đã có trong .gitignore)
-STORAGE_DIR      = BASE_DIR / "storage"
-DATA_PATH        = str(STORAGE_DIR / "uploads")
-VECTORSTORE_PATH = str(STORAGE_DIR / "chroma_db")
-DOCSTORE_PATH    = str(STORAGE_DIR / "docstore")
+STORAGE_DIR = Path(os.environ.get("STORAGE_DIR", BASE_DIR / "storage"))
+DATA_PATH = os.environ.get("DATA_PATH", str(STORAGE_DIR / "uploads"))
+VECTORSTORE_PATH = os.environ.get("VECTORSTORE_PATH", str(STORAGE_DIR / "chroma_db"))
+DOCSTORE_PATH = os.environ.get("DOCSTORE_PATH", str(STORAGE_DIR / "docstore"))
+FLASHRANK_CACHE_PATH = os.environ.get("FLASHRANK_CACHE", str(BASE_DIR / "flashrank_cache"))
 
 # Tạo thư mục nếu chưa tồn tại
-STORAGE_DIR.mkdir(parents=True, exist_ok=True)
-(STORAGE_DIR / "uploads").mkdir(parents=True, exist_ok=True)
-(STORAGE_DIR / "chroma_db").mkdir(parents=True, exist_ok=True)
-(STORAGE_DIR / "docstore").mkdir(parents=True, exist_ok=True)
+Path(DATA_PATH).mkdir(parents=True, exist_ok=True)
+Path(VECTORSTORE_PATH).mkdir(parents=True, exist_ok=True)
+Path(DOCSTORE_PATH).mkdir(parents=True, exist_ok=True)
+Path(FLASHRANK_CACHE_PATH).mkdir(parents=True, exist_ok=True)
 
 # ── API Keys ──────────────────────────────────────────────────────────────────
 # Ưu tiên theo thứ tự: GitHub → OpenRouter → Grok (xAI) → OpenAI → Gemini → Local
