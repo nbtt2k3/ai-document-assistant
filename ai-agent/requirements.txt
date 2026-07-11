@@ -28,6 +28,7 @@ numpy<2.0.0
 chromadb>=0.5.23
 rank_bm25==0.2.2
 flashrank
+langchain-cohere
 
 # Environment & utilities
 python-dotenv==1.0.1

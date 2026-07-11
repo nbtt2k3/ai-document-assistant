@@ -1,7 +1,6 @@
-
 services:
   web-api:
-    build: 
+    build:
       context: ./web-api
     restart: always
     ports:
@@ -25,21 +24,21 @@ services:
       ALLOWED_ORIGINS: http://localhost:3000,http://127.0.0.1:3000
 
   ai-agent:
-    build: 
+    build:
       context: ./ai-agent
     restart: always
     ports:
       - "8001:8001"
     volumes:
       - ./ai-agent:/app
-      - paddle_models:/root/.paddleocr
+      - ./ai-agent/models/ocr:/root/.paddleocr
     environment:
       # Runtime paths inside the container
       STORAGE_DIR: /app/storage
       DATA_PATH: /app/storage/uploads
       VECTORSTORE_PATH: /app/storage/chroma_db
       DOCSTORE_PATH: /app/storage/docstore
-      FLASHRANK_CACHE: /app/flashrank_cache
+      FLASHRANK_CACHE: /app/models/reranker
 
       # Local models on the host machine
       OLLAMA_BASE_URL: http://host.docker.internal:11434
@@ -48,6 +47,9 @@ services:
 
       # Download mirrors
       HF_ENDPOINT: https://hf-mirror.com
+
+      # Online Reranker
+      COHERE_API_KEY: ${COHERE_API_KEY:-}
 
       # Browser/API clients
       ALLOWED_ORIGINS: http://localhost:3000,http://localhost:8000,http://web-api:8000
@@ -68,4 +70,3 @@ services:
 
 volumes:
   postgres_data:
-  paddle_models:

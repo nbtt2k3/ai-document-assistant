@@ -64,12 +64,21 @@ def get_base_retriever(session_id: str, section_title: str = None, level: int = 
     else:
         intermediate_retriever = base_retriever
 
-    # Khởi tạo trực tiếp Ranker để ép dùng cache_dir vĩnh viễn, tránh flashrank tự xoá /tmp và tải lại
-    from flashrank import Ranker
-    from langchain_community.document_compressors.flashrank_rerank import DEFAULT_MODEL_NAME
-    
-    ranker_client = Ranker(model_name=DEFAULT_MODEL_NAME, cache_dir=FLASHRANK_CACHE_PATH)
-    compressor = FlashrankRerank(client=ranker_client, top_n=RERANK_TOP_N)
+    from src.app.config import COHERE_API_KEY
+    if COHERE_API_KEY:
+        from langchain_cohere import CohereRerank
+        compressor = CohereRerank(
+            cohere_api_key=COHERE_API_KEY, 
+            top_n=RERANK_TOP_N, 
+            model="rerank-multilingual-v3.0"
+        )
+    else:
+        # Khởi tạo trực tiếp Ranker để ép dùng cache_dir vĩnh viễn, tránh flashrank tự xoá /tmp và tải lại
+        from flashrank import Ranker
+        from langchain_community.document_compressors.flashrank_rerank import DEFAULT_MODEL_NAME
+        
+        ranker_client = Ranker(model_name=DEFAULT_MODEL_NAME, cache_dir=FLASHRANK_CACHE_PATH)
+        compressor = FlashrankRerank(client=ranker_client, top_n=RERANK_TOP_N)
     
     retriever = ContextualCompressionRetriever(
         base_compressor=compressor, base_retriever=intermediate_retriever

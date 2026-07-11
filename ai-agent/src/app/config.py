@@ -29,7 +29,7 @@ STORAGE_DIR = Path(os.environ.get("STORAGE_DIR", BASE_DIR / "storage"))
 DATA_PATH = os.environ.get("DATA_PATH", str(STORAGE_DIR / "uploads"))
 VECTORSTORE_PATH = os.environ.get("VECTORSTORE_PATH", str(STORAGE_DIR / "chroma_db"))
 DOCSTORE_PATH = os.environ.get("DOCSTORE_PATH", str(STORAGE_DIR / "docstore"))
-FLASHRANK_CACHE_PATH = os.environ.get("FLASHRANK_CACHE", str(BASE_DIR / "flashrank_cache"))
+FLASHRANK_CACHE_PATH = os.environ.get("FLASHRANK_CACHE", str(BASE_DIR / "models" / "reranker"))
 
 # Tạo thư mục nếu chưa tồn tại
 Path(DATA_PATH).mkdir(parents=True, exist_ok=True)
@@ -46,6 +46,7 @@ GROQ_API_KEY = os.environ.get("GROQ_API_KEY", "")
 OPENAI_API_KEY = os.environ.get("OPENAI_API_KEY", "")
 GEMINI_API_KEY = os.environ.get("GEMINI_API_KEY", "")
 LLAMA_CLOUD_API_KEY = os.environ.get("LLAMA_CLOUD_API_KEY", "")
+COHERE_API_KEY = os.environ.get("COHERE_API_KEY", "")
 
 # ── Online Model Names ────────────────────────────────────────────────────────
 GITHUB_LLM_MODEL       = os.environ.get("GITHUB_LLM_MODEL", "gpt-4o")
