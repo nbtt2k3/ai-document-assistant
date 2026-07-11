@@ -29,6 +29,9 @@ chromadb>=0.5.23
 rank_bm25==0.2.2
 flashrank
 langchain-cohere
+sentence-transformers
+transformers>=4.40.0
+tokenizers==0.22.2
 
 # Environment & utilities
 python-dotenv==1.0.1

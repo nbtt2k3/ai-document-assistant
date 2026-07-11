@@ -90,7 +90,7 @@ export default function InputBar({
           type="file"
           ref={fileInputRef}
           style={{ display: 'none' }}
-          accept=".pdf,.docx,.txt,.xlsx,.csv"
+          accept=".pdf,.docx,.txt,.xlsx,.csv,.png,.jpg,.jpeg"
           onChange={handleFileChange}
         />
 
@@ -100,7 +100,7 @@ export default function InputBar({
           className={styles.uploadBtn}
           onClick={() => fileInputRef.current?.click()}
           disabled={isStreaming || isUploading}
-          title="Đính kèm tài liệu (PDF, DOCX)"
+          title="Đính kèm tài liệu (PDF, DOCX, Ảnh)"
         >
           <Paperclip size={20} />
         </button>

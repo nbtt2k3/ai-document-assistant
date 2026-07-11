@@ -83,7 +83,7 @@ def _try_rebuild_from_chroma(session_id: str) -> bool:
     return False
 
 
-def get_bm25_results(session_id: str, query: str, k: int = 8) -> List[Document]:
+def get_bm25_results(session_id: str, query: str, k: int = 8, target_filename: str = None) -> List[Document]:
     """
     Tìm kiếm bằng BM25 cho một session cụ thể.
     Tự động rebuild từ ChromaDB nếu index không có trong RAM.
@@ -93,8 +93,16 @@ def get_bm25_results(session_id: str, query: str, k: int = 8) -> List[Document]:
         if not _try_rebuild_from_chroma(session_id):
             return []
 
-    bm25 = _bm25_indices[session_id]
     docs = _bm25_docs[session_id]
+    
+    if target_filename:
+        docs = [d for d in docs if target_filename.lower() in d.metadata.get("source", "").lower()]
+        if not docs:
+            return []
+        tokenized_corpus = [_preprocess(doc.page_content) for doc in docs]
+        bm25 = BM25Okapi(tokenized_corpus)
+    else:
+        bm25 = _bm25_indices[session_id]
 
     tokenized_query = _preprocess(query)
     return bm25.get_top_n(tokenized_query, docs, n=k)

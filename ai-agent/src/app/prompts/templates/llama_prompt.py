@@ -10,10 +10,10 @@ Your task is to read the user's question and classify it into EXACTLY ONE of the
 - SUMMARIZE: The user requests a summary of the entire document, a chapter, or a general overview. MUST contain summary keywords or questions about the general content in the user's language (e.g., "summarize", "summary", "tóm tắt", "ý chính", "nói về gì", "nội dung chính"). (Example: "Summarize this file", "Summarize chapter 1", "Tài liệu này nói về vấn đề gì").
 - TRANSLATE: The user requests to translate a text or document.
 
-NOTE: CLASSIFY ONLY BASED ON THE CURRENT QUESTION. ABSOLUTELY DO NOT BE INFLUENCED BY PREVIOUS QUESTIONS.""",
-        "human": """CURRENT USER QUESTION: {question}
+You must also extract the `target_filename` if the user's question specifically mentions a file name (e.g., 'file CNSD_C24_VN.pdf', 'tài liệu HDSD.docx'). If no specific file is mentioned, leave it empty.
 
-LABEL:"""
+NOTE: CLASSIFY ONLY BASED ON THE CURRENT QUESTION. ABSOLUTELY DO NOT BE INFLUENCED BY PREVIOUS QUESTIONS.""",
+        "human": """CURRENT USER QUESTION: {question}"""
     },
     
     "chitchat": {
@@ -53,10 +53,11 @@ Response:"""
     
     "reduce_summary": {
         "system": """You are an expert executive summarizer.
-Your task is to read multiple summaries of different parts of a document and combine them into one comprehensive, cohesive, and well-structured final summary.
+Your task is to read multiple summaries of different parts of one or more documents and combine them into a comprehensive, well-structured final summary.
 
 IMPORTANT RULES:
-- Combine all the points logically. Do not just list them; weave them into a coherent report.
+- If the summaries come from MULTIPLE DIFFERENT FILES (indicated by headings like "### Tóm tắt từ file: [Tên file]"), you MUST clearly separate the final summary by file name using Headings.
+- If it is a single document, weave all points into a cohesive report without separating by parts.
 - Use Markdown formatting (headings, bold text, bullet points) to make the summary easy to read.
 - If the provided summaries are mostly empty, unclear, or contain "IGNORE", politely inform the user that the document does not contain enough clear text to summarize.
 - The final summary MUST be in the language of the user's request.
@@ -93,6 +94,7 @@ RESPONSE RULES (VERY STRICT AND MANDATORY):
    - ONLY answer based on the explicit information present IN THE PROVIDED DOCUMENT.
    - ABSOLUTELY DO NOT use background knowledge, personal experience, or outside information. Do NOT add any extra advice, steps, or general knowledge that is not explicitly written in the document.
    - STRICTLY STAY ON TOPIC & BE CONCISE (HIGH RELEVANCY): Answer EXACTLY what the user asks. Do NOT provide extra, unrequested information or unrelated edge cases. Keep the answer as direct and focused as possible.
+   - HANDLING IMAGES/GENERAL QUESTIONS: If the user asks about an image or the general meaning of the document (e.g., "What is this picture about?", "What does this mean?"), you MUST synthesize the main topic from the provided context. Answer directly (e.g., "This image is about..."). DO NOT just copy-paste the raw text.
    - CRITICAL ANTI-HALLUCINATION RULE: Even if the document mentions some keywords from the question (e.g., PIN, Hotline), if it DOES NOT explicitly contain the actual answer to the user's specific question, you MUST politely state that the document does not contain the information to answer the question, matching the user's language. DO NOT guess, infer, elaborate, or invent an answer.
      [EXAMPLE SCENARIO]
      Document: "Report suspicious emails by sending them as attachments."

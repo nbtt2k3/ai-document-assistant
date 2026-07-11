@@ -45,11 +45,11 @@ def build_history_text(messages: list) -> str:
 
 
 def _unique_sources(sources: list[dict]) -> list[dict]:
-    """Lọc bỏ các nguồn tài liệu trùng lặp (cùng file + page)."""
+    """Lọc bỏ các nguồn tài liệu trùng lặp (cùng file + text)."""
     seen = set()
     unique = []
     for s in sources:
-        key = (s["file"], s["page"])
+        key = (s["file"], s.get("text", ""))
         if key not in seen:
             seen.add(key)
             unique.append(s)
@@ -167,6 +167,17 @@ async def create_event_stream(
                     raw_chunks.append(chunk_content)
                     data = json.dumps({"type": "chunk", "content": chunk_content}, ensure_ascii=False)
                     yield f"data: {data}\n\n"
+
+            # FIX: Nếu node kết thúc bằng một kết quả tĩnh (ví dụ báo lỗi 'Không tìm thấy tài liệu')
+            # mà không hề trigger on_chat_model_stream, ta sẽ push chuỗi tĩnh đó vào stream
+            if event["event"] == "on_chain_end" and event.get("name") in ["summarize", "chitchat", "generate_rag"]:
+                output = event.get("data", {}).get("output", {})
+                if isinstance(output, dict) and "generation" in output:
+                    if not raw_chunks:
+                        static_text = output["generation"]
+                        raw_chunks.append(static_text)
+                        data = json.dumps({"type": "chunk", "content": static_text}, ensure_ascii=False)
+                        yield f"data: {data}\n\n"
 
         full_answer = clean_output("".join(raw_chunks))
 

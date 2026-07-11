@@ -126,9 +126,9 @@ async def upload_file(
     )
     if not session:
         raise HTTPException(status_code=404, detail="Session not found")
-
-    ALLOWED_EXTENSIONS = {'.pdf', '.docx', '.txt', '.csv', '.xlsx'}
-    MAX_FILE_SIZE = 20 * 1024 * 1024 # 20MB
+    ALLOWED_EXTENSIONS = {'.pdf', '.docx', '.txt', '.csv', '.xlsx', '.png', '.jpg', '.jpeg'}
+    max_file_size_mb = int(os.getenv("MAX_FILE_SIZE_MB", 50))
+    MAX_FILE_SIZE = max_file_size_mb * 1024 * 1024
 
     file_ext = os.path.splitext(file.filename)[1].lower() if file.filename else ""
     if file_ext not in ALLOWED_EXTENSIONS:
@@ -136,7 +136,7 @@ async def upload_file(
 
     content = await file.read()
     if len(content) > MAX_FILE_SIZE:
-        raise HTTPException(status_code=400, detail="File quá lớn. Vui lòng tải lên file nhỏ hơn 20MB.")
+        raise HTTPException(status_code=400, detail=f"File quá lớn. Vui lòng tải lên file nhỏ hơn {max_file_size_mb}MB.")
 
     async with httpx.AsyncClient(timeout=1800.0) as client:
         try:

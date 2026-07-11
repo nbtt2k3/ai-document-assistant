@@ -29,12 +29,13 @@ from src.app.config import FLASHRANK_CACHE_PATH, RERANK_TOP_N
 class SessionBM25Retriever(BaseRetriever):
     """LangChain-compatible retriever wrapper cho BM25 per-session."""
     session_id: str
+    target_filename: str = None
 
     def _get_relevant_documents(self, query: str, *, run_manager=None) -> List[Document]:
-        return get_bm25_results(self.session_id, query, k=3)
+        return get_bm25_results(self.session_id, query, k=3, target_filename=self.target_filename)
 
 
-def get_base_retriever(session_id: str, section_title: str = None, level: int = None):
+def get_base_retriever(session_id: str, section_title: str = None, level: int = None, target_filename: str = None):
     """
     Tạo Hybrid Retriever (BM25 + Vector + Rerank).
     MultiQueryRetriever chỉ bật khi dùng API online để tiết kiệm VRAM với Ollama local.
@@ -44,8 +45,8 @@ def get_base_retriever(session_id: str, section_title: str = None, level: int = 
         return get_retriever_for_section(session_id, section_title, level)
 
     from src.app.rag.vectorstore import get_retriever_for_session
-    vector_retriever = get_retriever_for_session(session_id)
-    bm25_retriever = SessionBM25Retriever(session_id=session_id)
+    vector_retriever = get_retriever_for_session(session_id, target_filename)
+    bm25_retriever = SessionBM25Retriever(session_id=session_id, target_filename=target_filename)
 
     base_retriever = EnsembleRetriever(
         retrievers=[bm25_retriever, vector_retriever],
@@ -64,7 +65,8 @@ def get_base_retriever(session_id: str, section_title: str = None, level: int = 
     else:
         intermediate_retriever = base_retriever
 
-    from src.app.config import COHERE_API_KEY
+    from src.app.config import COHERE_API_KEY, LOCAL_RERANKER_PATH
+    import os
     if COHERE_API_KEY:
         from langchain_cohere import CohereRerank
         compressor = CohereRerank(
@@ -72,6 +74,12 @@ def get_base_retriever(session_id: str, section_title: str = None, level: int = 
             top_n=RERANK_TOP_N, 
             model="rerank-multilingual-v3.0"
         )
+    elif os.path.exists(LOCAL_RERANKER_PATH):
+        from langchain_classic.retrievers.document_compressors import CrossEncoderReranker
+        from langchain_community.cross_encoders import HuggingFaceCrossEncoder
+        
+        model = HuggingFaceCrossEncoder(model_name=LOCAL_RERANKER_PATH)
+        compressor = CrossEncoderReranker(model=model, top_n=RERANK_TOP_N)
     else:
         # Khởi tạo trực tiếp Ranker để ép dùng cache_dir vĩnh viễn, tránh flashrank tự xoá /tmp và tải lại
         from flashrank import Ranker

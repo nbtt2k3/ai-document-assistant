@@ -12,11 +12,24 @@ from src.app.core.rate_limit import limiter
 from slowapi import _rate_limit_exceeded_handler
 from slowapi.errors import RateLimitExceeded
 
+from sqlalchemy import text
+
 # Tạo các bảng DB nếu chưa có (bao bọc try/except để app không crash khi DB chưa sẵn sàng)
 try:
     Base.metadata.create_all(bind=engine)
+    
+    # Auto-migrate: Thêm cột 'sources' nếu chưa có (thay thế cho migrate_db.py)
+    with engine.connect() as conn:
+        result = conn.execute(text(
+            "SELECT column_name FROM information_schema.columns WHERE table_name='messages' and column_name='sources';"
+        ))
+        if not result.fetchone():
+            print("[DB] Adding 'sources' column to 'messages' table...")
+            conn.execute(text("ALTER TABLE messages ADD COLUMN sources JSON DEFAULT '[]'::json;"))
+            conn.commit()
+            print("[DB] Migration successful.")
 except Exception as e:
-    print(f"[WARNING] Không thể kết nối DB để tạo bảng: {e}")
+    print(f"[WARNING] Không thể kết nối DB để tạo/cập nhật bảng: {e}")
     print("[WARNING] Hãy đảm bảo PostgreSQL đang chạy và DATABASE_URL trong .env là đúng.")
 
 app = FastAPI(title="AI Document Assistant API")

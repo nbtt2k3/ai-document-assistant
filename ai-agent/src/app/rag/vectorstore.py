@@ -135,14 +135,43 @@ def add_documents_to_session(session_id: str, docs: list[Document]):
     retriever.add_documents(parent_docs)
 
 
-def get_retriever_for_session(session_id: str):
-    """Lấy ParentDocumentRetriever với filter theo session_id."""
+def get_retriever_for_session(session_id: str, target_filename: str = None):
+    """Lấy ParentDocumentRetriever với filter theo session_id và target_filename."""
     db = _get_chroma_db()
     store = _get_docstore()
 
+    search_filter = {"session_id": session_id}
+    if target_filename:
+        # Fix ChromaDB $contains bug: Find matching sources in Python first
+        try:
+            results = db.get(where={"session_id": session_id}, include=["metadatas"])
+            metas = results.get("metadatas", [])
+            valid_sources = set()
+            for m in metas:
+                if m and "source" in m:
+                    if target_filename.lower() in m["source"].lower():
+                        valid_sources.add(m["source"])
+            if valid_sources:
+                if len(valid_sources) == 1:
+                    search_filter = {
+                        "$and": [
+                            {"session_id": session_id},
+                            {"source": list(valid_sources)[0]}
+                        ]
+                    }
+                else:
+                    search_filter = {
+                        "$and": [
+                            {"session_id": session_id},
+                            {"source": {"$in": list(valid_sources)}}
+                        ]
+                    }
+        except Exception as e:
+            logging.error(f"Error filtering sources for retriever: {e}")
+
     # Đếm số lượng child chunks thực tế để tránh lỗi hnswlib
     try:
-        results = db.get(where={"session_id": session_id}, include=[])
+        results = db.get(where=search_filter, include=[])
         num_chunks = len(results.get("ids", []))
     except Exception:
         num_chunks = 3
@@ -155,7 +184,7 @@ def get_retriever_for_session(session_id: str):
         child_splitter=_get_child_splitter(),
         search_kwargs={
             "k": k,
-            "filter": {"session_id": session_id}
+            "filter": search_filter
         }
     )
 
@@ -213,18 +242,23 @@ def get_session_documents(session_id: str) -> list[Document]:
         logging.error(f"[vectorstore] Error fetching documents for session {session_id}: {e}")
         return []
 
-def get_all_parent_documents(session_id: str) -> list[Document]:
+def get_all_parent_documents(session_id: str, target_filename: str = None) -> list[Document]:
     """Lấy tất cả Parent Documents của một session để dùng cho Map-Reduce."""
     db = _get_chroma_db()
     store = _get_docstore()
     try:
         # Lấy metadatas để tìm doc_id của Parent Documents
-        results = db.get(where={"session_id": session_id}, include=["metadatas"])
+        search_filter = {"session_id": session_id}
+        results = db.get(where=search_filter, include=["metadatas"])
         metadatas = results.get("metadatas", [])
         
         doc_ids = set()
         for meta in metadatas:
             if meta and "doc_id" in meta:
+                if target_filename:
+                    source = meta.get("source", "")
+                    if target_filename.lower() not in source.lower():
+                        continue
                 doc_ids.add(meta["doc_id"])
                 
         if not doc_ids:

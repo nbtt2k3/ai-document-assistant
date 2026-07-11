@@ -10,9 +10,9 @@ pydantic
 # Database & Auth
 sqlalchemy
 psycopg2-binary
-passlib[bcrypt]
+bcrypt
 python-jose[cryptography]
 python-multipart
 
 # Rate limiting
-slowapi
+slowapi

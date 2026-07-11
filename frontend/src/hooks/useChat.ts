@@ -58,7 +58,7 @@ export function useChat(activeSessionId: string | null) {
       // Tự động thông báo cho AI biết đã có file mới
       setTimeout(() => {
         sendQuery(
-          `[SYSTEM] File "${file.name}" vừa được tải lên thành công. Dựa vào thông tin này, hãy nói "Tôi đã nhận được tài liệu ${file.name} và đã thêm vào bộ nhớ. Bạn muốn tôi giúp gì?" và KHÔNG CẦN TÓM TẮT.`,
+          `[SYSTEM] File "${file.name}" uploaded. Ignore the "RESPONSE LANGUAGE" rule for this message. Acknowledge receipt of the file and ask how you can help. Your response MUST be in the same language as the user's previous messages. DO NOT summarize the file.`,
           true
         );
       }, 500);

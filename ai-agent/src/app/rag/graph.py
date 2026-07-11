@@ -19,6 +19,10 @@ class RouteIntent(BaseModel):
     intent: Literal["RAG", "CHITCHAT", "SUMMARIZE", "TRANSLATE"] = Field(
         description="The classified intent of the user's question."
     )
+    target_filename: str = Field(
+        description="The specific filename the user is asking about, if mentioned. Otherwise empty string.", 
+        default=""
+    )
 
 
 class GraphState(TypedDict):
@@ -26,6 +30,7 @@ class GraphState(TypedDict):
     question: str
     chat_history: str
     intent: str
+    target_filename: str
     documents: List[Document]
     generation: str
     retries: int
@@ -33,18 +38,51 @@ class GraphState(TypedDict):
 def create_crag_graph(session_id: str, section_title: str = None, level: int = None):
     llm = get_llm()
     from src.app.rag.chain import get_base_retriever
-    retriever = get_base_retriever(session_id, section_title, level)
 
     async def route_question(state: GraphState):
-        prompt = ChatPromptTemplate.from_messages(PromptManager.get_langchain_messages("router"))
-        structured_llm = llm.with_structured_output(RouteIntent)
-        chain = prompt | structured_llm
-        result = await chain.ainvoke({"question": state["question"], "chat_history": state["chat_history"]})
-        intent = result.intent
-        logging.info(f"[ROUTER] Question: '{state['question']}' -> Intent: {intent}")
-        return {"intent": intent}
+        raw_messages = PromptManager.get_langchain_messages("router")
+        
+        # 1. Thử dùng chuẩn Function Calling (Tốt nhất cho mô hình lớn như GPT-4, Llama 70B)
+        try:
+            prompt_fc = ChatPromptTemplate.from_messages(raw_messages)
+            chain_fc = prompt_fc | llm.with_structured_output(RouteIntent)
+            result = await chain_fc.ainvoke({"question": state["question"], "chat_history": state["chat_history"]})
+            intent = result.intent
+            target_filename = result.target_filename
+            
+        except Exception as e_fc:
+            logging.warning(f"[ROUTER] Function Calling thất bại ({e_fc}), tự động chuyển sang JsonOutputParser...")
+            
+            # 2. Fallback sang JsonOutputParser (Trâu bò nhất cho mô hình nhỏ như Llama 8B, Ollama)
+            try:
+                from langchain_core.output_parsers import JsonOutputParser
+                parser = JsonOutputParser(pydantic_object=RouteIntent)
+                system_msg = raw_messages[0][1] + "\n\n{format_instructions}\nBẮT BUỘC TRẢ VỀ CHUẨN JSON."
+                prompt_json = ChatPromptTemplate.from_messages([
+                    ("system", system_msg),
+                    ("human", raw_messages[1][1])
+                ])
+                chain_json = prompt_json | llm | parser
+                result_dict = await chain_json.ainvoke({
+                    "question": state["question"], 
+                    "chat_history": state["chat_history"],
+                    "format_instructions": parser.get_format_instructions()
+                })
+                intent = result_dict.get("intent", "RAG")
+                target_filename = result_dict.get("target_filename", "")
+                
+            except Exception as e_json:
+                logging.error(f"[ROUTER] JsonOutputParser cũng thất bại ({e_json}), fallback về cấu hình an toàn.")
+                # 3. Fallback cuối cùng: Đảm bảo hệ thống không bao giờ sập (Crash)
+                intent = "RAG"
+                target_filename = ""
+                
+        logging.info(f"[ROUTER] Question: '{state['question']}' -> Intent: {intent}, TargetFile: {target_filename}")
+        return {"intent": intent, "target_filename": target_filename}
 
     async def retrieve(state: GraphState):
+        target_filename = state.get("target_filename", "")
+        retriever = get_base_retriever(session_id, section_title, level, target_filename)
         documents = await retriever.ainvoke(state["question"])
         return {"documents": documents}
 
@@ -99,7 +137,8 @@ def create_crag_graph(session_id: str, section_title: str = None, level: int = N
 
     async def summarize_node(state: GraphState, config: RunnableConfig):
         logging.info(f"[CRAG] Bắt đầu Map-Reduce Summarize cho session {session_id}")
-        docs = get_all_parent_documents(session_id)
+        target_filename = state.get("target_filename", "")
+        docs = get_all_parent_documents(session_id, target_filename)
         
         if not docs:
             return {"generation": "Không tìm thấy tài liệu nào để tóm tắt."}
@@ -111,29 +150,40 @@ def create_crag_graph(session_id: str, section_title: str = None, level: int = N
         
         async def _map_doc(doc):
             async with sem:
-                context = f"[Trang {doc.metadata.get('page', 0)} - {doc.metadata.get('source', 'Unknown').split('/')[-1]}]\n{doc.page_content}"
+                source_name = doc.metadata.get('source', 'Unknown').split('/')[-1]
+                context = f"[Trang {doc.metadata.get('page', 0)} - {source_name}]\n{doc.page_content}"
                 for attempt in range(3):
                     try:
                         res = await map_chain.ainvoke({"context": context, "question": state["question"]}, config)
                         # Tránh spam API dồn dập
                         await asyncio.sleep(2)
-                        return res.strip()
+                        return (source_name, res.strip())
                     except Exception as e:
                         if "429" in str(e) or "Rate limit" in str(e):
                             logging.warning(f"[CRAG] Rate limit hit, sleeping for 30s... (Attempt {attempt+1}/3)")
                             await asyncio.sleep(30)
                         else:
                             logging.error(f"[CRAG] Map error: {e}")
-                            return ""
-                return ""
+                            return (source_name, "")
+                return (source_name, "")
                 
         map_results = await asyncio.gather(*[_map_doc(doc) for doc in docs])
-        valid_summaries = [res for res in map_results if res and "IGNORE" not in res.upper()]
         
-        if not valid_summaries:
+        # Nhóm các summary theo filename để truyền cho Reduce
+        from collections import defaultdict
+        grouped_summaries = defaultdict(list)
+        for source_name, res in map_results:
+            if res and "IGNORE" not in res.upper():
+                grouped_summaries[source_name].append(res)
+        
+        if not grouped_summaries:
             return {"generation": "Không tìm thấy nội dung nào khớp với yêu cầu tóm tắt của bạn trong tài liệu."}
             
-        combined_summaries = "\n\n---\n\n".join(valid_summaries)
+        combined_parts = []
+        for source_name, summaries in grouped_summaries.items():
+            combined_parts.append(f"### Tóm tắt từ file: {source_name}\n" + "\n".join(summaries))
+            
+        combined_summaries = "\n\n---\n\n".join(combined_parts)
         
         reduce_prompt = ChatPromptTemplate.from_messages(PromptManager.get_langchain_messages("reduce_summary"))
         reduce_chain = reduce_prompt | llm.with_config(tags=["final_generation"]) | StrOutputParser()

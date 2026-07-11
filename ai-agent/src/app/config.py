@@ -30,6 +30,7 @@ DATA_PATH = os.environ.get("DATA_PATH", str(STORAGE_DIR / "uploads"))
 VECTORSTORE_PATH = os.environ.get("VECTORSTORE_PATH", str(STORAGE_DIR / "chroma_db"))
 DOCSTORE_PATH = os.environ.get("DOCSTORE_PATH", str(STORAGE_DIR / "docstore"))
 FLASHRANK_CACHE_PATH = os.environ.get("FLASHRANK_CACHE", str(BASE_DIR / "models" / "reranker"))
+LOCAL_RERANKER_PATH = os.environ.get("LOCAL_RERANKER_PATH", str(BASE_DIR / "models" / "hugging-face" / "bge-reranker-v2-m3"))
 
 # Tạo thư mục nếu chưa tồn tại
 Path(DATA_PATH).mkdir(parents=True, exist_ok=True)

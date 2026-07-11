@@ -20,13 +20,21 @@ class CustomPDFLoader:
         self.file_path = file_path
 
     def load(self) -> list[Document]:
+        docs = []
         import fitz
         from src.app.config import LLAMA_CLOUD_API_KEY
+        
+        # Hàm hỗ trợ để đếm số trang
+        def get_total_pages(path: str) -> int:
+            with fitz.open(path) as d:
+                return len(d)
+                
+        total_pages = get_total_pages(self.file_path)
+        parsed_successfully = False
 
-        docs = []
-        try:
-            # 1. Trích xuất text/markdown
-            if LLAMA_CLOUD_API_KEY:
+        # 1. THỬ LLAMAPARSE (NẾU CÓ KEY)
+        if LLAMA_CLOUD_API_KEY:
+            try:
                 print("  [INFO] Dùng LlamaParse để xử lý bố cục phức tạp...")
                 import nest_asyncio
                 nest_asyncio.apply()
@@ -42,12 +50,29 @@ class CustomPDFLoader:
                         page_content=d.text,
                         metadata={"source": self.file_path, "page": i + 1}
                     ))
-            else:
+                parsed_successfully = True
+            except Exception as e:
+                print(f"  [WARNING] LlamaParse thất bại (hết hạn mức hoặc lỗi mạng): {e}. Tự động chuyển sang Local...")
+
+        # 2. THỬ PYMUPDF4LLM LOCAL KÈM BATCHING (NẾU LLAMAPARSE THẤT BẠI HOẶC KHÔNG CÓ KEY)
+        if not parsed_successfully:
+            try:
+                print(f"  [INFO] Dùng pymupdf4llm đọc Local theo từng lô 5 trang (Tổng {total_pages} trang)...")
                 import pymupdf4llm
-                try:
-                    page_chunks = pymupdf4llm.to_markdown(self.file_path, page_chunks=True)
+                import gc
+                
+                BATCH_SIZE = 5
+                for start_idx in range(0, total_pages, BATCH_SIZE):
+                    end_idx = min(start_idx + BATCH_SIZE, total_pages)
+                    pages_to_extract = list(range(start_idx, end_idx))
+                    
+                    # Dùng doc object để tránh lỗi đường dẫn khi chạy batch
+                    doc_for_batch = fitz.open(self.file_path)
+                    page_chunks = pymupdf4llm.to_markdown(doc_for_batch, pages=pages_to_extract, page_chunks=True)
+                    doc_for_batch.close()
+                    
                     for chunk in page_chunks:
-                        # page metadata của pymupdf4llm là 1-based
+                        # metadata page của pymupdf4llm là 1-based (tuỳ phiên bản, nhưng ta có thể tin tưởng nó)
                         page_num = chunk.get("metadata", {}).get("page", 0)
                         text = chunk.get("text", "")
                         if text.strip():
@@ -55,19 +80,39 @@ class CustomPDFLoader:
                                 page_content=text,
                                 metadata={"source": self.file_path, "page": page_num}
                             ))
-                except Exception as e:
-                    print(f"  [ERROR] Lỗi dùng pymupdf4llm: {e}")
-                    # Fallback: dùng PyMuPDF trực tiếp
-                    with fitz.open(self.file_path) as doc_fallback:
-                        for i, page in enumerate(doc_fallback):
-                            text = page.get_text()
-                            if text.strip():
-                                docs.append(Document(
-                                    page_content=text,
-                                    metadata={"source": self.file_path, "page": i + 1}
-                                ))
+                            
+                    # Giải phóng bộ nhớ khẩn cấp sau mỗi lô
+                    del page_chunks
+                    gc.collect()
+                    
+                # Nếu chạy xong mà không có chữ nào (hoặc quá ít), có thể là file scan
+                if not docs or sum(len(d.page_content) for d in docs) < 100:
+                    print("  [WARNING] pymupdf4llm không tìm thấy text (có thể là file scan). Chuyển sang OCR...")
+                    parsed_successfully = False
+                    docs.clear()
+                else:
+                    parsed_successfully = True
+            except Exception as e:
+                print(f"  [WARNING] Lỗi dùng pymupdf4llm: {e}. Tự động chuyển sang PyMuPDF thô...")
 
-            # 2. Xử lý ảnh nhúng (OCR) và nối vào trang tương ứng
+        # 3. FALLBACK CUỐI CÙNG: ĐỌC TEXT THUẦN BẰNG PYMUPDF
+        if not parsed_successfully:
+            try:
+                print("  [INFO] Dùng PyMuPDF đọc text thuần...")
+                with fitz.open(self.file_path) as doc_fallback:
+                    for i, page in enumerate(doc_fallback):
+                        text = page.get_text()
+                        if text.strip():
+                            docs.append(Document(
+                                page_content=text,
+                                metadata={"source": self.file_path, "page": i + 1}
+                            ))
+            except Exception as e:
+                print(f"  [ERROR] Lỗi nghiêm trọng khi đọc PDF bằng mọi cách: {e}")
+
+            # 4. Xử lý ảnh nhúng (OCR) và nối vào trang tương ứng
+            print("  [INFO] Đang quét tìm và OCR ảnh trong PDF...")
+            import gc
             with fitz.open(self.file_path) as doc_fitz:
                 for page_num in range(len(doc_fitz)):
                     page_fitz = doc_fitz[page_num]
@@ -95,12 +140,14 @@ class CustomPDFLoader:
                             img_docs = ImageOCRLoader(tmp_path).load()
                             if img_docs:
                                 img_contents.append(img_docs[0].page_content)
-
+                                
+                            del img_docs
                         except Exception:
                             continue
                         finally:
                             if tmp_path and os.path.exists(tmp_path):
                                 os.unlink(tmp_path)
+                            gc.collect()
                     
                     if img_contents:
                         img_text = "\n\n=== NỘI DUNG ẢNH TRONG TÀI LIỆU ===\n" + "\n\n".join(img_contents)
@@ -120,7 +167,6 @@ class CustomPDFLoader:
                                 metadata={"source": self.file_path, "page": target_page}
                             ))
 
-        except Exception as e:
-            print(f"  [ERROR] Lỗi đọc PDF: {e}")
+
 
         return docs

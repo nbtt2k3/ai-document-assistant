@@ -32,13 +32,20 @@ AI Document Assistant là hệ thống hỏi đáp tài liệu theo kiến trúc
 
 ## Environment
 
-Mỗi service có một file env mẫu riêng:
+Mỗi service có một file env mẫu riêng, và Docker Compose dùng thêm file root `.env`:
 
+- `.env.example` ở root: biến chung cho Docker Compose.
 - `ai-agent/.env.example`
 - `web-api/.env.example`
 - `frontend/.env.example`
 
-Tạo env local:
+Tạo env local cho Docker Compose:
+
+```powershell
+Copy-Item .env.example .env
+```
+
+Tạo env local cho từng service khi chạy riêng:
 
 ```powershell
 Copy-Item ai-agent\.env.example ai-agent\.env
@@ -78,6 +85,7 @@ Trong Docker Compose:
 - `web-api` gọi Postgres qua `db:5432`.
 - `web-api` gọi `ai-agent` qua `http://ai-agent:8001`.
 - `ai-agent` gọi Ollama trên host qua `http://host.docker.internal:11434`.
+- `frontend` chạy ngay trong compose và trỏ API qua `NEXT_PUBLIC_API_URL`.
 
 ## Chạy Local Từng Service
 
